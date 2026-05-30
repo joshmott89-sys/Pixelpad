@@ -8,8 +8,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="PixelPad">
-<link rel="manifest" href="./manifest.json">
-<title>PixelPad v6.6</title>
+<!-- manifest injected dynamically by injectManifest() -->
+<title>PixelPad v6.5</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.js"></script>
 <style>
@@ -229,6 +229,15 @@ input, select, textarea { font-family: var(--mono); }
 .f-act:active { background: var(--bdr2) !important; }
 .f-act.danger { color: var(--er) !important; }
 .f-act.danger:active { background: #4a1a1a !important; }
+
+/* ── AI Share-Target Snippet Banner ─────────────────────────────────────── */
+#snip-banner { display: none; position: fixed; top: calc(var(--hh) + 4px); left: 8px; right: 8px; z-index: 62; background: #0d1f16; border: 1px solid var(--acd); border-radius: 8px; padding: 8px 10px; align-items: center; gap: 8px; box-shadow: 0 4px 20px rgba(0,232,122,.18); animation: slidedown .22s ease; }
+#snip-banner.on { display: flex; }
+@keyframes slidedown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:none; } }
+#snip-banner-lbl { flex: 1; font-size: 10px; font-weight: 700; color: var(--ac); letter-spacing: .04em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snip-act { height: 26px; padding: 0 9px; border-radius: 4px; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+.snip-ins { background: var(--ac); color: #000; }
+.snip-dis { background: var(--rai); border: 1px solid var(--bdr2); color: var(--mu); }
 
 </style>
 </head>
@@ -485,6 +494,11 @@ input, select, textarea { font-family: var(--mono); }
 </div>
 
 <div id="toast"></div>
+<div id="snip-banner">
+  <span id="snip-banner-lbl">⚡ AI Snippet Intercepted — Ready for validation</span>
+  <button class="snip-act snip-ins" onclick="insertIncomingSnip()">Insert</button>
+  <button class="snip-act snip-dis" onclick="dismissSnipBanner()">✕</button>
+</div>
 <script>
 'use strict';
 
@@ -504,13 +518,79 @@ let pyo = null; let pyLd = false; let lastErr = ''; let curHtml = '';
 
 (function boot() {
   try { cfg = Object.assign(cfg, JSON.parse(localStorage.getItem('pp_c') || '{}')); } catch(e) {}
+  injectManifest();
   loadWorkspace();
   initEditor(); lay(); renderSide(); updateDynamicToolbars(); initGestures(); initKeyboard();
   window.addEventListener('resize', lay);
   window.addEventListener('beforeunload', e => {
     if (!curFile && _ed && _ed.getValue().trim()) { e.preventDefault(); e.returnValue = ''; }
   });
+  // Check for incoming share payload after editor is ready
+  setTimeout(checkSharePayload, 350);
 })();
+
+// ── Dynamic Inline Manifest (single-file PWA) ────────────────────────────────
+function injectManifest() {
+  // Derive the base path so the manifest works on root AND subdirectory deploys
+  // e.g. '/' for root, '/pixelpad/' for a GitHub Pages project page
+  const basePath = window.location.pathname.replace(/[^/]*$/, '') || '/';
+
+  // Build an SVG icon so the manifest is fully self-contained (no external assets)
+  const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="80" fill="#080b0a"/>
+    <rect x="60" y="80" width="392" height="280" rx="14" fill="#0f1412" stroke="#253028" stroke-width="6"/>
+    <rect x="60" y="360" width="392" height="8" fill="#253028"/>
+    <text x="80" y="185" font-family="monospace" font-size="56" fill="#00e87a">&lt;/&gt;</text>
+    <text x="80" y="265" font-family="monospace" font-size="42" fill="#4a6055">def run():</text>
+    <text x="80" y="325" font-family="monospace" font-size="36" fill="#334038">  pass</text>
+    <rect x="156" y="388" width="200" height="40" rx="8" fill="#253028"/>
+    <rect x="220" y="398" width="72" height="20" rx="4" fill="#0f1412"/>
+  </svg>`;
+  const iconUri = 'data:image/svg+xml,' + encodeURIComponent(iconSvg);
+
+  const manifest = {
+    name: 'PixelPad',
+    short_name: 'PixelPad',
+    description: 'Mobile-first single-file code editor',
+    display: 'standalone',
+    orientation: 'portrait-primary',
+    background_color: '#080b0a',
+    theme_color: '#080b0a',
+    start_url: basePath + '?pwa=1',
+    scope: basePath,
+    icons: [
+      { src: iconUri, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
+      { src: iconUri, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+    ],
+    share_target: {
+      action: basePath + '?share-target',
+      method: 'POST',
+      enctype: 'multipart/form-data',
+      params: {
+        title: 'title',
+        text:  'text',
+        url:   'url',
+        files: [{
+          name:   'files',
+          accept: [
+            'text/plain', 'text/html', 'text/css', 'text/javascript',
+            'application/json', '.py', '.js', '.html', '.css', '.json', '.md', '.txt'
+          ]
+        }]
+      }
+    }
+  };
+
+  try {
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+    const url  = URL.createObjectURL(blob);
+    const link = document.createElement('link');
+    link.rel   = 'manifest';
+    link.href  = url;
+    document.head.appendChild(link);
+  } catch(e) {}
+}
+
 
 function loadWorkspace() {
   try { const raw = localStorage.getItem('pp_w'); if (raw) W = JSON.parse(raw); } catch(e) {}
@@ -1082,34 +1162,183 @@ function restBackup(inp) {
   r.readAsText(f); inp.value = '';
 }
 
-// ── Service Worker: Network-First / Cache-Fallback ──────────────────────────
+// ── Share-Target Payload Handler ─────────────────────────────────────────────
+async function checkSharePayload() {
+  if (!window.location.search.includes('shared=true')) return;
+  // Immediately clean the URL so a manual reload doesn't re-trigger
+  history.replaceState(null, '', window.location.pathname);
+
+  try {
+    const cache = await caches.open('pixelpad-share');
+    const resp  = await cache.match('/payload');
+    if (!resp) return;
+    const raw = await resp.text();
+    await cache.delete('/payload'); // consume-once: never replay
+
+    const parsed = parseAIPayload(raw);
+    if (!parsed) return;
+
+    // ── Routing heuristic ────────────────────────────────────────────────────
+    // "Full document" signals: HTML doctype/tag, or >2 kB of content
+    const looksLikeFullDoc =
+      /^\s*<!doctype\s+html/i.test(parsed) ||
+      /^\s*<html/i.test(parsed) ||
+      parsed.length > 2400;
+
+    if (looksLikeFullDoc) {
+      // Load directly into the active editor
+      ed().setValue(parsed, -1);
+      const mode = /^\s*<!doctype\s+html|^\s*<html/i.test(parsed)
+        ? 'ace/mode/html'
+        : modeFor(curFile || '');
+      ed().session.setMode(mode);
+      setUD(true);
+      toast('AI file loaded into editor ✓', 'ok');
+    } else {
+      // Stash as an injectable snippet and surface the banner
+      window.incomingSnipePayload = parsed;
+      showSnipBanner('⚡ AI Snippet Intercepted — Ready for validation');
+    }
+  } catch(e) {
+    toast('Share payload error: ' + e.message, 'bad');
+  }
+}
+
+function parseAIPayload(raw) {
+  if (!raw || !raw.trim()) return null;
+
+  // 1. Prefer the LARGEST code-fence block (handles ```js, ```html, ```python, etc.)
+  const fenceRe = /```(?:[a-z]*)\r?\n?([\s\S]*?)```/gi;
+  let best = null;
+  let m;
+  while ((m = fenceRe.exec(raw)) !== null) {
+    if (!best || m[1].length > best.length) best = m[1];
+  }
+  if (best) return best.trim();
+
+  // 2. No fence found — strip common AI conversational-filler lead lines then return
+  const fillerRe = /^(here['']?s?|here is|sure[,!]?|of course[,!]?|certainly[,!]?|absolutely[,!]?|below is|the following|i['']ve (added|updated|created|written)|this is)[^\n]*/gim;
+  return raw.replace(fillerRe, '').trim() || raw.trim();
+}
+
+function showSnipBanner(msg) {
+  const b = document.getElementById('snip-banner');
+  document.getElementById('snip-banner-lbl').textContent = msg;
+  b.classList.add('on');
+}
+
+function dismissSnipBanner() {
+  document.getElementById('snip-banner').classList.remove('on');
+  window.incomingSnipePayload = null;
+}
+
+function insertIncomingSnip() {
+  const snip = window.incomingSnipePayload;
+  if (!snip) { dismissSnipBanner(); return; }
+  // If the editor is empty, replace entirely; otherwise insert at cursor
+  if (!ed().getValue().trim()) {
+    ed().setValue(snip, -1);
+  } else {
+    ed().insert(snip);
+  }
+  ed().focus();
+  dismissSnipBanner();
+  setUD(true);
+  toast('Snippet inserted ✓', 'ok');
+}
+
+
+// -- Service Worker: Network-First / Cache-Fallback + Share-Target POST ------
 (function registerSW() {
   if (!('serviceWorker' in navigator)) return;
+
+  // Derive the same base path used by injectManifest() so the SW scope and the
+  // manifest action URL are always in agreement, regardless of deploy depth.
+  const swScope = window.location.pathname.replace(/[^/]*$/, '') || '/';
+
+  // NOTE: swCode is plain-ASCII inside so older Android WebViews don't choke on
+  // multi-byte characters embedded in a blob: URL script.
+  // All internal URLs are derived from self.registration.scope at runtime so the
+  // SW works correctly on root *and* subdirectory (GitHub Pages project) deploys.
   const swCode = `
-const CACHE = 'pixelpad-v1';
-self.addEventListener('install', e => {
+var CACHE       = 'pixelpad-v1';
+var SHARE_CACHE = 'pixelpad-share';
+
+// Install: pre-cache the app shell at the SW's own scope URL
+self.addEventListener('install', function(e) {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(c => c.add('/').catch(() => {})));
-});
-self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        if (res.ok || res.type === 'opaque') {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      })
-      .catch(() => caches.match(e.request))
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(function(c) { return c.add(self.registration.scope).catch(function(){}); })
   );
 });
+
+// Activate: take control of all open tabs immediately
+self.addEventListener('activate', function(e) { e.waitUntil(clients.claim()); });
+
+// Fetch: POST share-target interception, then Network-First GET
+self.addEventListener('fetch', function(e) {
+
+  // 1. Share-target POST -------------------------------------------------
+  if (e.request.method === 'POST') {
+    try {
+      var u = new URL(e.request.url);
+      if (u.searchParams.has('share-target')) {
+        e.respondWith((function() {
+          return e.request.formData().then(function(fd) {
+            var text  = fd.get('text')  || '';
+            var title = fd.get('title') || '';
+            var url   = fd.get('url')   || '';
+            var extracted = text || title || url;
+
+            // If a file was shared, read its content
+            if (!extracted) {
+              var files = fd.getAll('files');
+              if (files.length && typeof files[0].text === 'function') {
+                return files[0].text().then(function(t) {
+                  return storeAndRedirect(t);
+                });
+              }
+            }
+            return storeAndRedirect(extracted);
+          }).catch(function() { return storeAndRedirect(''); });
+        })());
+        return;
+      }
+    } catch(_) {}
+  }
+
+  // 2. Network-First / Cache-Fallback for GET ----------------------------
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    fetch(e.request).then(function(res) {
+      if (res.ok || res.type === 'opaque') {
+        var clone = res.clone();
+        caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
+      }
+      return res;
+    }).catch(function() { return caches.match(e.request); })
+  );
+});
+
+function storeAndRedirect(text) {
+  return caches.open(SHARE_CACHE).then(function(sc) {
+    return sc.put('/payload', new Response(text, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    }));
+  }).catch(function(){}).then(function() {
+    return Response.redirect(self.registration.scope + '?shared=true', 303);
+  });
+}
 `;
-  const blob = new Blob([swCode], { type: 'application/javascript' });
-  const url  = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(url).catch(() => {});
+
+  try {
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    const url  = URL.createObjectURL(blob);
+    // Use the computed swScope so Chrome never sees a scope that violates the
+    // blob URL's max-scope constraint (which caused the SecurityError / "Script error.")
+    navigator.serviceWorker.register(url, { scope: swScope }).catch(function() {});
+  } catch(_) {}
 })();
 
 
