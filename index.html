@@ -489,7 +489,8 @@ input, select, textarea { font-family: var(--mono); }
 'use strict';
 
 let _ed;
-let cfg = { gkey:'', ckey:'', ghuser:'', ghtoken:'' };
+let cfg = { gkey:'', ckey:'', ghtoken:'' };
+let ghUserCache = null; // session-only; populated by ensureGhUser() from PAT, never persisted
 let W = { activeProject: null, projects: {}, localOrder: [], syncedOrder: [] };
 let curFile = null;
 let pendingAction = null; 
@@ -504,7 +505,7 @@ let pyo = null; let pyLd = false; let lastErr = ''; let curHtml = '';
 (function boot() {
   try { cfg = Object.assign(cfg, JSON.parse(localStorage.getItem('pp_c') || '{}')); } catch(e) {}
   loadWorkspace();
-  initEditor(); lay(); renderSide(); initGestures(); initKeyboard();
+  initEditor(); lay(); renderSide(); updateDynamicToolbars(); initGestures(); initKeyboard();
   window.addEventListener('resize', lay);
   window.addEventListener('beforeunload', e => {
     if (!curFile && _ed && _ed.getValue().trim()) { e.preventDefault(); e.returnValue = ''; }
@@ -627,10 +628,13 @@ function toB64(str) { return btoa(unescape(encodeURIComponent(str))); }
 function fromB64(str) { return decodeURIComponent(escape(atob(str))); }
 
 async function ensureGhUser() {
-  if (!cfg.ghtoken || !navigator.onLine) return false;
+  if (!cfg.ghtoken) { toast('Set GitHub Token in Settings', 'bad'); return false; }
+  if (ghUserCache) return true; // already resolved this session
+  if (!navigator.onLine) { toast('Offline — cannot verify GitHub token', 'bad'); return false; }
   try {
-    const u = await ghApi('/user'); cfg.ghuser = u.login;
-    localStorage.setItem('pp_c', JSON.stringify(cfg)); return true;
+    const u = await ghApi('/user');
+    ghUserCache = u.login;
+    return true;
   } catch (e) {
     toast('Invalid GitHub Token', 'bad'); return false;
   }
@@ -713,7 +717,8 @@ async function loadFile(name) {
     if (!navigator.onLine) return toast("Offline. Cannot fetch.", "bad");
     toast(`Downloading ${name}...`, '');
     try {
-      const res = await ghApi(`/repos/${cfg.ghuser}/${W.activeProject}/git/blobs/${p.files[name].sha}`);
+      const hasUser = await ensureGhUser(); if (!hasUser) return;
+      const res = await ghApi(`/repos/${ghUserCache}/${W.activeProject}/git/blobs/${p.files[name].sha}`);
       p.files[name].content = fromB64(res.content || ''); p.files[name].downloaded = true; p.files[name].savedAt = Date.now();
       saveWorkspace(); toast('Downloaded!', 'ok');
     } catch(e) { return toast('Failed: ' + e.message, 'bad'); }
@@ -729,10 +734,18 @@ function confirmSaveAs() {
   closeModal('mod-saveas'); curFile = name; setHeaderFile(name, W.activeProject);
   ed().session.setMode(modeFor(name)); swTab(/\.html?$/i.test(name) ? 'html' : 'py');
   persistFile(name, ed().getValue()); setUD(false); renderSide(); flashSave();
-  
-  if (pendingAction === 'push') { pendingAction = null; pushFile(); }
-  else if (pendingAction === 'publish') { pendingAction = null; publishProject(); }
-  else { toast(`Saved as ${name}`, 'ok'); }
+
+  if (pendingAction === 'push') {
+    pendingAction = null;
+    // File is now named & saved — go straight to the push without re-checking the name guard.
+    // Still honour the API-key safety check before committing.
+    if (checkApiKeys('push')) doPushFile();
+  } else if (pendingAction === 'publish') {
+    pendingAction = null;
+    if (checkApiKeys('publish')) doPublishProject();
+  } else {
+    toast(`Saved as ${name}`, 'ok');
+  }
 }
 
 function newFile() { curFile = null; ed().setValue('', -1); ed().session.setMode('ace/mode/python'); setHeaderFile('untitled.py', W.activeProject); setUD(false); swTab('py'); renderSide(); closeSide(); }
@@ -797,8 +810,8 @@ async function doPublishProject() {
     for (const [name, f] of Object.entries(p.files)) {
       if (!f.content) continue;
       const safeFile = encodeURIComponent(name); let sha = f.sha || null;
-      try { const info = await ghApi(`/repos/${cfg.ghuser}/${repo}/contents/${safeFile}`); sha = info.sha; } catch(e) {}
-      const res = await ghApi(`/repos/${cfg.ghuser}/${repo}/contents/${safeFile}`, 'PUT', { message: `Publish ${name}`, content: toB64(f.content), sha: sha });
+      try { const info = await ghApi(`/repos/${ghUserCache}/${repo}/contents/${safeFile}`); sha = info.sha; } catch(e) {}
+      const res = await ghApi(`/repos/${ghUserCache}/${repo}/contents/${safeFile}`, 'PUT', { message: `Publish ${name}`, content: toB64(f.content), sha: sha });
       f.sha = res.content.sha;
     }
     p.isSynced = true;
@@ -833,7 +846,7 @@ async function openCloneModal() {
 async function doCloneRepo(name, branch) {
   toast(`Cloning ${name}...`, '');
   try {
-    const tree = await ghApi(`/repos/${cfg.ghuser}/${name}/git/trees/${branch}?recursive=1`);
+    const tree = await ghApi(`/repos/${ghUserCache}/${name}/git/trees/${branch}?recursive=1`);
     W.projects[name] = { createdAt: Date.now(), files: {}, isSynced: true };
     const blobs = tree.tree.filter(t => t.type === 'blob');
     blobs.forEach(b => { W.projects[name].files[b.path] = { content: '', sha: b.sha, downloaded: false }; });
@@ -848,11 +861,11 @@ async function pullFile(filename) {
   if (!cfg.ghtoken) return toast('Set GitHub Token', 'bad');
   const hasUser = await ensureGhUser(); if (!hasUser) return;
   const repo = W.activeProject.replace(/[^a-zA-Z0-9_\-.]/g, '-');
-  const name = filename || prompt(`Enter file to pull from ${cfg.ghuser}/${repo}:`, curFile || 'index.html'); if (!name) return;
+  const name = filename || prompt(`Enter file to pull from ${ghUserCache}/${repo}:`, curFile || 'index.html'); if (!name) return;
   const safeFile = encodeURIComponent(name);
   try {
     toast(`Pulling ${name}...`, '');
-    const res = await ghApi(`/repos/${cfg.ghuser}/${repo}/contents/${safeFile}`);
+    const res = await ghApi(`/repos/${ghUserCache}/${repo}/contents/${safeFile}`);
     if (res.type !== 'file') throw new Error('Target is not a file');
     const content = fromB64(res.content); persistFile(name, content, res.sha);
     if (curFile === name || !curFile) { curFile = name; ed().setValue(content, -1); setHeaderFile(name, repo); setUD(false); ed().session.setMode(modeFor(name)); }
@@ -874,8 +887,8 @@ async function doPushFile() {
   const content = ed().getValue(); const fileObj = activeFiles()[curFile]; const safeFile = encodeURIComponent(curFile);
   try {
     toast('Pushing to GitHub...', ''); let sha = fileObj?.sha || null;
-    try { const info = await ghApi(`/repos/${cfg.ghuser}/${repo}/contents/${safeFile}`); sha = info.sha; } catch (e) {}
-    const res = await ghApi(`/repos/${cfg.ghuser}/${repo}/contents/${safeFile}`, 'PUT', { message: `Update ${curFile} via PixelPad`, content: toB64(content), sha: sha });
+    try { const info = await ghApi(`/repos/${ghUserCache}/${repo}/contents/${safeFile}`); sha = info.sha; } catch (e) {}
+    const res = await ghApi(`/repos/${ghUserCache}/${repo}/contents/${safeFile}`, 'PUT', { message: `Update ${curFile} via PixelPad`, content: toB64(content), sha: sha });
     persistFile(curFile, content, res.content.sha); setUD(false); renderSide(); flashSave(); toast('Pushed to GitHub!', 'ok');
   } catch(e) { toast('Push failed: ' + e.message, 'bad'); }
 }
@@ -992,7 +1005,15 @@ function repOne() { const t = document.getElementById('srch-inp').value; const r
 function repAll() { const t = document.getElementById('srch-inp').value; const r = document.getElementById('rep-inp').value; if(!t)return; try { let n=0; ed().find(t, srchAceOpts({ start: { row: 0, column: 0 }, skipCurrent: false })); while (ed().getSelectedText() && n<5000) { ed().replace(r); n++; ed().find(t, srchAceOpts({ skipCurrent: true })); } srchTotal = 0; srchIdx = 0; document.getElementById('srch-count').textContent = n ? 'Done' : 'No matches'; toast('Replaced '+n, 'ok'); } catch(e){} }
 
 function openSettings() { document.getElementById('cfg-ghtoken').value = cfg.ghtoken || ''; document.getElementById('cfg-gkey').value = cfg.gkey; document.getElementById('cfg-ckey').value = cfg.ckey; openModal('mod-settings'); }
-function saveSettings() { cfg.ghtoken = document.getElementById('cfg-ghtoken').value.trim(); cfg.gkey = document.getElementById('cfg-gkey').value.trim(); cfg.ckey = document.getElementById('cfg-ckey').value.trim(); cfg.ghuser = ''; localStorage.setItem('pp_c', JSON.stringify(cfg)); closeModal('mod-settings'); toast('Saved', 'ok'); }
+function saveSettings() {
+  const newToken = document.getElementById('cfg-ghtoken').value.trim();
+  if (newToken !== cfg.ghtoken) ghUserCache = null; // invalidate session cache on PAT change
+  cfg.ghtoken = newToken;
+  cfg.gkey = document.getElementById('cfg-gkey').value.trim();
+  cfg.ckey = document.getElementById('cfg-ckey').value.trim();
+  localStorage.setItem('pp_c', JSON.stringify(cfg));
+  closeModal('mod-settings'); toast('Saved', 'ok');
+}
 function setProv(p) { aiProv = p; document.getElementById('pb-gem').classList.toggle('on', p === 'gem'); document.getElementById('pb-cla').classList.toggle('on', p === 'cla'); document.getElementById('ai-send').className = p; }
 
 async function sendAI() {
@@ -1060,6 +1081,37 @@ function restBackup(inp) {
   };
   r.readAsText(f); inp.value = '';
 }
+
+// ── Service Worker: Network-First / Cache-Fallback ──────────────────────────
+(function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  const swCode = `
+const CACHE = 'pixelpad-v1';
+self.addEventListener('install', e => {
+  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE).then(c => c.add('/').catch(() => {})));
+});
+self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        if (res.ok || res.type === 'opaque') {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      })
+      .catch(() => caches.match(e.request))
+  );
+});
+`;
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  const url  = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url).catch(() => {});
+})();
+
 
 </script>
 </body>
