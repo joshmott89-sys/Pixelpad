@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="PixelPad">
 <link rel="manifest" href="./manifest.json">
-<title>pixelpadv6.6.1</title>
+<title>pixelpadv6.7</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.js"></script>
 <style>
@@ -22,7 +22,7 @@
   --r-sm:  4px;
   --r-md:  8px;
   --r-lg:  14px;
-  --hh:    46px; --tbh:   52px; --sbh:   36px; --safe:  env(safe-area-inset-bottom, 0px);
+  --hh:    46px; --tbh:   52px; --tth:   40px;  --sbh:   36px; --safe:  env(safe-area-inset-bottom, 0px);
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
@@ -93,13 +93,24 @@ input, select, textarea { font-family: var(--mono); }
 .sn:active { background: var(--bdr2); color: var(--ac); }
 .kw { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--mu); }
 
-#tb { position: fixed; bottom: 0; left: 0; right: 0; background: var(--sur); border-top: 1px solid var(--bdr); display: flex; align-items: stretch; z-index: 50; box-shadow: 0 -2px 16px rgba(0,0,0,.5); transition: transform .22s; }
+/* ── Two-tier Ribbon Toolbar ───────────────────────────────────────────────── */
+#tb { position: fixed; bottom: 0; left: 0; right: 0; background: var(--sur); border-top: 1px solid var(--bdr); display: flex; flex-direction: column; z-index: 50; box-shadow: 0 -2px 16px rgba(0,0,0,.5); transition: transform .22s; }
 #tb.kbup { transform: translateY(100%); }
-.t-btn { flex: 1; height: calc(var(--tbh) + var(--safe)); padding-bottom: var(--safe); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--mu); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; transition: background .12s, color .12s; border-right: 1px solid var(--bdr); }
+#tb-acts { display: flex; height: calc(var(--tbh) + var(--safe)); border-bottom: 1px solid var(--bdr); flex-shrink: 0; }
+.tb-pane { display: none; flex: 1; } .tb-pane.on { display: flex; }
+.t-btn { flex: 1; height: 100%; padding-bottom: var(--safe); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--mu); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; transition: background .12s, color .12s; border-right: 1px solid var(--bdr); }
 .t-btn:last-child { border-right: none; }
 .t-btn:active { background: var(--rai); color: var(--tx); }
 .t-btn.flash { color: var(--ac) !important; }
 .t-btn svg { width: 18px; height: 18px; }
+#tb-tabs { display: flex; height: var(--tth); flex-shrink: 0; }
+.tb-tab { flex: 1; height: 100%; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 11px; font-weight: 700; font-family: var(--ui); color: var(--mu); border-right: 1px solid var(--bdr); border-top: 2px solid transparent; transition: color .15s, border-color .15s, background .12s; }
+.tb-tab:last-child { border-right: none; }
+.tb-tab.on { color: var(--ac); border-top-color: var(--ac); background: var(--rai); }
+.tb-tab:active { background: var(--card); }
+/* Ace fold gutter — wider hit target for thumbs */
+.ace_gutter { min-width: 42px !important; }
+.ace_fold-widget { transform: scale(1.3); transform-origin: center; }
 
 #save-strip { position: fixed; left: 0; right: 0; height: 44px; background: var(--sur); border-top: 1px solid var(--bdr2); display: none; align-items: center; gap: 6px; padding: 0 10px; z-index: 61; }
 #ss-name { flex: 1; min-width: 0; font-size: 11px; color: var(--mu); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -275,6 +286,42 @@ input, select, textarea { font-family: var(--mono); }
 #toast.has-undo { pointer-events: all; }
 #toast-undo-btn { background: none; border: none; color: var(--ac); font-size: 11px; font-weight: 700; font-family: var(--mono); cursor: pointer; padding: 0 0 0 6px; text-decoration: underline; vertical-align: baseline; }
 
+/* ── Runtime Error Toast ──────────────────────────────────────────────────── */
+#err-toast { position: fixed; left: 50%; transform: translateX(-50%) translateY(6px); background: #1a0609; border: 1px solid var(--er); border-radius: var(--r-lg); padding: 10px 14px; font-size: 12px; font-weight: 700; pointer-events: none; opacity: 0; z-index: 998; transition: opacity .2s, transform .2s; box-shadow: 0 4px 24px rgba(255,77,109,.25); font-family: var(--ui); display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); white-space: nowrap; }
+#err-toast.on { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: all; }
+#err-toast-msg { color: var(--er); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#err-toast-fix { flex-shrink: 0; height: 28px; padding: 0 10px; background: var(--er); color: #fff; border-radius: 5px; font-size: 11px; font-weight: 700; font-family: var(--ui); border: none; cursor: pointer; transition: filter .12s; white-space: nowrap; }
+#err-toast-fix:active { filter: brightness(1.2); }
+#err-toast-close { flex-shrink: 0; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 4px; color: var(--mu); font-size: 14px; background: none; border: none; cursor: pointer; }
+#err-toast-close:active { color: var(--tx); }
+/* ── Scroll Jump Buttons ──────────────────────────────────────────────────── */
+.scroll-btn { position: fixed; right: 12px; width: 48px; height: 48px; border-radius: 50%; background: #000; border: 2px solid var(--ac); color: var(--ac); font-size: 24px; display: flex; align-items: center; justify-content: center; z-index: 54; opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: 0 3px 16px rgba(0,0,0,.7); }
+.scroll-btn.on { opacity: 1; pointer-events: all; }
+.scroll-btn:active { background: #111; transform: scale(.94); }
+#scroll-dn { /* positioned by lay() just above toolbar */ }
+#scroll-up { /* positioned by lay() at vertical midpoint of editor */ }
+
+/* ── Structure Navigator Panel ───────────────────────────────────────────── */
+#struct-panel { position: fixed; inset: 0; z-index: 210; display: flex; flex-direction: column; background: var(--sur); transform: translateY(100%); transition: transform .27s cubic-bezier(.4,0,.2,1); }
+#struct-panel.on { transform: translateY(0); }
+#struct-hdr { height: var(--hh); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--bdr); background: var(--rai); }
+#struct-title { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--mu); font-family: var(--ui); }
+#struct-file { font-size: 12px; font-weight: 700; color: var(--ac); font-family: var(--mono); margin-left: 8px; }
+#struct-close { width: 36px; height: 36px; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: var(--mu); font-size: 18px; }
+#struct-close:active { background: var(--rai); color: var(--tx); }
+#struct-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#struct-empty { padding: 40px 20px; text-align: center; color: var(--mu); font-size: 13px; font-family: var(--ui); }
+.st-node { display: flex; align-items: center; min-height: 52px; border-bottom: 1px solid var(--bdr); cursor: pointer; transition: background .1s; user-select: none; }
+.st-node:active { background: var(--card); }
+.st-node.st-top { background: var(--rai); }
+.st-toggle { flex-shrink: 0; width: 36px; height: 52px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--mu); }
+.st-indent { flex-shrink: 0; }
+.st-icon { flex-shrink: 0; font-size: 16px; margin-right: 8px; }
+.st-label { flex: 1; font-size: 14px; font-family: var(--mono); color: var(--tx); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 8px; }
+.st-line { flex-shrink: 0; font-size: 12px; color: var(--mu); font-family: var(--mono); padding-right: 14px; min-width: 42px; text-align: right; background: var(--bg); border-radius: 4px; padding: 3px 8px; margin-right: 10px; }
+.st-children { }
+.st-children.collapsed { display: none; }
+
 </style>
 </head>
 <body>
@@ -287,9 +334,7 @@ input, select, textarea { font-family: var(--mono); }
     <span id="cur-file">untitled.py</span>
   </div>
   <div id="hr">
-    <button class="hbtn" onclick="openSearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
-    <button id="ai-btn" onclick="openAI()"><svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L13.6 9.4L21 12L13.6 14.6L12 22L10.4 14.6L3 12L10.4 9.4Z"/><circle cx="19" cy="5" r="1.5"/><circle cx="5" cy="19" r="1"/></svg>AI</button>
-    <button class="hbtn" onclick="openSettings()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    <button id="ai-btn" onclick="openAI()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L13.6 9.4L21 12L13.6 14.6L12 22L10.4 14.6L3 12L10.4 9.4Z"/><circle cx="19" cy="5" r="1.5"/><circle cx="5" cy="19" r="1"/></svg>AI</button>
     <button id="run-btn" onclick="runCode()"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>RUN</button>
   </div>
 </div>
@@ -319,6 +364,22 @@ input, select, textarea { font-family: var(--mono); }
 
 <button id="snip-tog" onclick="togSnip()">&#x2328;</button>
 <button id="rpb" onclick="openMagicPaste()">&#x21e3; MAGIC PASTE</button>
+<button id="scroll-dn" class="scroll-btn" onmousedown="event.preventDefault()" onclick="scrollToBottom()">↓</button>
+<button id="scroll-up" class="scroll-btn" onmousedown="event.preventDefault()" onclick="scrollToTop()">↑</button>
+
+<!-- Structure Navigator -->
+<div id="struct-panel">
+  <div id="struct-hdr">
+    <div style="display:flex;align-items:center;min-width:0;">
+      <span id="struct-title">STRUCTURE</span>
+      <span id="struct-file"></span>
+    </div>
+    <button id="struct-close" onmousedown="event.preventDefault()" onclick="closeStructure()">✕</button>
+  </div>
+  <div id="struct-scroll">
+    <div id="struct-empty">Parsing…</div>
+  </div>
+</div>
 
 <div id="sw">
   <div id="sb">
@@ -351,11 +412,53 @@ input, select, textarea { font-family: var(--mono); }
 </div>
 
 <div id="tb">
-  <button class="t-btn" onclick="doUndo()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="9,14 4,9 9,4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>Undo</button>
-  <button class="t-btn" onclick="doCopy()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
-  <button class="t-btn" onclick="openMagicPaste()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>Paste</button>
-  <button class="t-btn" id="tb-pull-btn" onclick="pullFile(null)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>GH Pull</button>
-  <button class="t-btn flash" id="tb-push-btn" onclick="pushFile()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>GH Push</button>
+
+  <!-- ── Action tier ─────────────────────────────────────────────────────── -->
+  <div id="tb-acts">
+
+    <!-- Code pane (default) -->
+    <div class="tb-pane on" id="tbp-code">
+      <button class="t-btn" onclick="doUndo()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="9,14 4,9 9,4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>Undo</button>
+      <button class="t-btn" onclick="doCopy()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
+      <button class="t-btn" onclick="openMagicPaste()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>Paste</button>
+      <button class="t-btn" onmousedown="event.preventDefault()" onclick="openStructure()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Structure</button>
+    </div>
+
+    <!-- Git pane -->
+    <div class="tb-pane" id="tbp-git">
+      <button class="t-btn" id="tb-pull-btn" onclick="pullFile(null)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Pull</button>
+      <button class="t-btn flash" id="tb-push-btn" onclick="pushFile()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Push</button>
+      <button class="t-btn" id="tb-publish-btn" onclick="publishProject()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>Publish</button>
+    </div>
+
+    <!-- Tools pane -->
+    <div class="tb-pane" id="tbp-tools">
+      <button class="t-btn" onclick="runCode()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>Run</button>
+      <button class="t-btn" onclick="openSearch()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Search</button>
+      <button class="t-btn" onclick="openAI()" style="color:var(--gem);">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L13.6 9.4L21 12L13.6 14.6L12 22L10.4 14.6L3 12L10.4 9.4Z"/></svg>AI</button>
+      <button class="t-btn" onclick="openSettings()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
+    </div>
+
+  </div>
+
+  <!-- ── Tab tier ──────────────────────────────────────────────────────── -->
+  <div id="tb-tabs">
+    <button class="tb-tab on" id="tbt-code" onclick="switchRibbonTab('code')">&#x1F4DD; Code</button>
+    <button class="tb-tab" id="tbt-git"  onclick="switchRibbonTab('git')">&#x2601;&#xFE0F; Git</button>
+    <button class="tb-tab" id="tbt-tools" onclick="switchRibbonTab('tools')">&#x1F6E0;&#xFE0F; Tools</button>
+  </div>
+
 </div>
 
 <div id="save-strip">
@@ -602,6 +705,11 @@ input, select, textarea { font-family: var(--mono); }
 </div>
 
 <div id="toast"></div>
+<div id="err-toast">
+  <span id="err-toast-msg">⚠️ Runtime Error</span>
+  <button id="err-toast-fix" onclick="autoFixError()">🤖 AUTO-FIX</button>
+  <button id="err-toast-close" onclick="dismissErrToast()">✕</button>
+</div>
 <script>
 'use strict';
 
@@ -618,20 +726,40 @@ let outH = 0; let kbUp = false; let snipOn = true; let autoT = null;
 let aiProv = 'gem'; let srchOpen = false; let srchOpts = { Aa: false, W: false, Re: false };
 let srchTotal = 0; let srchIdx = 0;
 let pyo = null; let pyLd = false; let lastErr = ''; let curHtml = '';
+let lastIframeError = ''; // set by the postMessage bridge from the preview iframe
 
 // Magic Paste state — declared here so they're NEVER in TDZ when any fn runs
 let mpParsed = null;
 let mpRaw    = null;
 let toastT;   // used by toast() and toastUndo() throughout
 
+// ── Ribbon Tab Switcher ───────────────────────────────────────────────────
+function switchRibbonTab(tab) {
+  ['code','git','tools'].forEach(t => {
+    document.getElementById('tbp-'  + t).classList.toggle('on', t === tab);
+    document.getElementById('tbt-'  + t).classList.toggle('on', t === tab);
+  });
+}
+
 (function boot() {
-  console.log('[PixelPad v6.6] Magic Paste engine loaded');
+  console.log('[PixelPad v6.7] Error Interceptor + Magic Paste loaded');
   try { cfg = Object.assign(cfg, JSON.parse(localStorage.getItem('pp_c') || '{}')); } catch(e) {}
   loadWorkspace();
   initEditor(); lay(); renderSide(); updateDynamicToolbars(); initGestures(); initKeyboard();
+  initScrollJump();
   window.addEventListener('resize', lay);
   window.addEventListener('beforeunload', e => {
     if (!curFile && _ed && _ed.getValue().trim()) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // ── Phase 2.1: PostMessage bridge — receives errors from preview iframe ──
+  window.addEventListener('message', ev => {
+    if (!ev.data || ev.data.type !== 'pp-error') return;
+    const { msg, line, col } = ev.data;
+    const short = (msg || 'Unknown error').slice(0, 120);
+    const detail = line ? `${short} (L${line}${col ? ':' + col : ''})` : short;
+    lastIframeError = detail;
+    showErrToast(detail);
   });
 })();
 
@@ -683,7 +811,7 @@ function initEditor() {
   _ed = ace.edit('editor');
   _ed.setTheme('ace/theme/monokai');
   _ed.session.setMode('ace/mode/python');
-  _ed.setOptions({ fontSize: '15px', wrap: true, showPrintMargin: false, tabSize: 4, useSoftTabs: true });
+  _ed.setOptions({ fontSize: '15px', wrap: true, showPrintMargin: false, tabSize: 4, useSoftTabs: true, showFoldWidgets: true, foldStyle: 'markbegin' });
   _ed.session.on('change', () => {
     setUD(true); clearTimeout(autoT);
     autoT = setTimeout(() => { if (curFile) persistFile(curFile, ed().getValue()); }, 1500);
@@ -694,7 +822,8 @@ function ed() { return _ed; }
 function setUD(on) { document.getElementById('udot').classList.toggle('on', on); }
 
 function lay() {
-  const tbh = kbUp ? 0 : 52; const hh = kbUp ? 0 : 46; const sbh = snipOn ? 36 : 0;
+  const tbh = kbUp ? 0 : 92; const hh = kbUp ? 0 : 46; // tbh = action(52) + tabs(40)
+  const sbh = snipOn ? 36 : 0;
   const srchEl = document.getElementById('srch'); const srchH = srchOpen ? (srchEl ? srchEl.offsetHeight : 78) : 0;
   const fixedBottom = tbh + sbh; const edBottom = fixedBottom + outH;
   
@@ -720,6 +849,15 @@ function lay() {
   document.getElementById('rpb').style.bottom = (floatBase + 6) + 'px';
   document.getElementById('snip-tog').style.bottom = (floatBase + 4) + 'px';
   document.getElementById('toast').style.bottom = (floatBase + 10) + 'px';
+  document.getElementById('err-toast').style.bottom = (floatBase + 58) + 'px';
+  // ↓ button: just above the toolbar
+  document.getElementById('scroll-dn').style.bottom = (floatBase + 10) + 'px';
+  // ↑ button: vertically centred in the editor area
+  const editorTop = parseInt(document.getElementById('ew').style.top || '46', 10);
+  const editorHeight = window.innerHeight - editorTop - floatBase;
+  const midY = editorTop + Math.floor(editorHeight / 2);
+  document.getElementById('scroll-up').style.top = midY + 'px';
+  document.getElementById('scroll-up').style.bottom = 'auto';
   setTimeout(() => { if (_ed) _ed.resize(); }, 30);
 }
 
@@ -787,10 +925,10 @@ function updateDynamicToolbars() {
   document.getElementById('hdr-acts-synced').style.display = isSynced ? 'flex' : 'none';
   document.getElementById('btn-unlink').style.display = isSynced ? 'flex' : 'none';
 
-  document.getElementById('tb-pull-btn').style.display = isSynced ? 'flex' : 'none';
-  const tbPush = document.getElementById('tb-push-btn');
-  tbPush.innerHTML = isSynced ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>GH Push' : '☁️ Publish';
-  tbPush.onclick = isSynced ? pushFile : publishProject;
+  // Ribbon Git tab: show Pull+Push for synced, Publish for local
+  document.getElementById('tb-pull-btn').style.display    = isSynced ? 'flex' : 'none';
+  document.getElementById('tb-push-btn').style.display    = isSynced ? 'flex' : 'none';
+  document.getElementById('tb-publish-btn').style.display = isSynced ? 'none' : 'flex';
 
   document.getElementById('ss-pull-btn').style.display = isSynced ? 'block' : 'none';
   const ssPush = document.getElementById('ss-push-btn');
@@ -1089,6 +1227,221 @@ function si(raw) { const d = raw.replace(/&lt;/g,'<').replace(/&gt;/g,'>').repla
 function insBoiler() { ed().setValue(`<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>My Page</title>\n  <style>\n    body { margin: 0; font-family: sans-serif; }\n  </style>\n</head>\n<body>\n\n  <script>\n  <\/script>\n</body>\n</html>`, -1); ed().session.setMode('ace/mode/html'); ed().focus(); }
 function doUndo() { ed().undo(); ed().focus(); }
 function doCopy() { const t = ed().getCopyText(); if (!t) return toast('Nothing selected', ''); navigator.clipboard.writeText(t).then(() => toast('Copied!', 'ok')).catch(() => { document.execCommand('copy'); toast('Copied!', 'ok'); }); }
+
+// ── Scroll Jump Buttons ───────────────────────────────────────────────────
+function _scrollMax() {
+  // renderer.layerConfig.maxHeight is Ace's internal total document pixel height
+  // renderer.$size.height is the visible viewport height
+  const r = ed().renderer;
+  const docH  = (r.layerConfig && r.layerConfig.maxHeight) || (ed().session.getLength() * (r.lineHeight || 16));
+  const viewH = (r.$size && r.$size.height) || r.scroller.clientHeight;
+  return Math.max(0, docH - viewH);
+}
+
+function initScrollJump() {
+  function updateJump() {
+    const session   = ed().session;
+    const renderer  = ed().renderer;
+    const total     = session.getLength();
+    const visible   = renderer.getLastVisibleRow() - renderer.getFirstVisibleRow();
+    const hasScroll = total > visible + 2;
+    const scrollTop = session.getScrollTop();
+    const maxScroll = _scrollMax();
+    const atTop    = scrollTop <= 2;
+    const atBottom = maxScroll <= 0 || scrollTop >= maxScroll - 4;
+    document.getElementById('scroll-dn').classList.toggle('on', hasScroll && !atBottom);
+    document.getElementById('scroll-up').classList.toggle('on', hasScroll && !atTop);
+  }
+  ed().session.on('changeScrollTop', updateJump);
+  ed().session.on('change', () => setTimeout(updateJump, 60));
+  updateJump();
+}
+
+function scrollToBottom() {
+  ed().session.setScrollTop(_scrollMax());
+  setTimeout(() => {
+    document.getElementById('scroll-dn').classList.remove('on');
+    document.getElementById('scroll-up').classList.add('on');
+  }, 60);
+}
+
+function scrollToTop() {
+  ed().session.setScrollTop(0);
+  setTimeout(() => {
+    document.getElementById('scroll-up').classList.remove('on');
+    document.getElementById('scroll-dn').classList.add('on');
+  }, 60);
+}
+
+// ── Structure Navigator ───────────────────────────────────────────────────
+
+function openStructure() {
+  const src  = ed().getValue();
+  const file = curFile || 'untitled';
+  document.getElementById('struct-file').textContent = ' — ' + file;
+  renderStructure(parseStructure(src, file));
+  document.getElementById('struct-panel').classList.add('on');
+}
+
+function closeStructure() {
+  document.getElementById('struct-panel').classList.remove('on');
+}
+
+function parseStructure(src, filename) {
+  const ext = (filename.match(/\.(\w+)$/) || ['',''])[1].toLowerCase();
+  if (ext === 'html' || ext === 'htm') return parseHtml(src.split('\n'));
+  if (ext === 'js')   return parseJs(src.split('\n'));
+  if (ext === 'css')  return parseCss(src.split('\n'));
+  if (ext === 'py')   return parsePy(src.split('\n'));
+  if (ext === 'json') return parseJson(src.split('\n'));
+  if (src.trimStart().startsWith('<') || /<!doctype/i.test(src.slice(0,100))) return parseHtml(src.split('\n'));
+  return parseJs(src.split('\n'));
+}
+
+function parseHtml(lines) {
+  const VOID = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr','!doctype']);
+  const root = []; const stack = [{ children: root }];
+  lines.forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line || /^<!--/.test(line)) return;
+    const tagRe = /<(\/?)([\w-]+)([^>]*)>/g; let m;
+    while ((m = tagRe.exec(line)) !== null) {
+      const closing = m[1] === '/'; const tag = m[2].toLowerCase(); const attrs = m[3];
+      if (VOID.has(tag)) continue;
+      if (!closing) {
+        let label = '<' + tag;
+        const id  = (attrs.match(/id=["']([^"']+)["']/)    || [])[1];
+        const cls = (attrs.match(/class=["']([^"']+)["']/) || [])[1];
+        const typ = (attrs.match(/type=["']([^"']+)["']/)  || [])[1];
+        if (id)              label += ' #' + id;
+        else if (cls)        label += ' .' + cls.split(' ')[0];
+        else if (typ)        label += ' ' + typ;
+        label += '>';
+        const node = { label, icon: '🏷', line: i+1, endLine: i+1, depth: stack.length - 1, children: [] };
+        stack[stack.length - 1].children.push(node);
+        if (!/\/>$/.test(m[0])) stack.push(node);
+      } else {
+        if (stack.length > 1) {
+          const closed = stack.pop();
+          closed.endLine = i + 1; // record closing tag line
+        }
+      }
+    }
+  });
+  // Any unclosed tags get endLine = last line
+  const lastLine = lines.length;
+  function closeUnclosed(nodes) { nodes.forEach(n => { if (!n.endLine || n.endLine === n.line) n.endLine = lastLine; closeUnclosed(n.children); }); }
+  closeUnclosed(root);
+  return root;
+}
+
+function parseJs(lines) {
+  const items = [];
+  lines.forEach((raw, i) => {
+    const t = raw.trim(); let m;
+    m = t.match(/^(?:export\s+)?(?:async\s+)?function[\s*]+([\w$]+)/);
+    if (m) { items.push({ label: 'fn ' + m[1] + '()', icon: '⚡', line: i+1, depth: 0, children: [] }); return; }
+    m = t.match(/^(?:export\s+)?(?:const|let|var)\s+([\w$]+)\s*=\s*(?:async\s+)?(?:function|\(|[\w$]+\s*=>)/);
+    if (m) { items.push({ label: m[1] + ' →', icon: '⚡', line: i+1, depth: 0, children: [] }); return; }
+    m = t.match(/^(?:export\s+)?class\s+([\w$]+)/);
+    if (m) { items.push({ label: 'class ' + m[1], icon: '🔷', line: i+1, depth: 0, children: [] }); return; }
+    m = raw.match(/^(\s{2,})((?:async\s+)?([\w$]+)\s*\([^)]*\)\s*\{)/);
+    if (m && !/^\s*(\/\/|if|for|while|switch|try|catch)/.test(t)) {
+      items.push({ label: m[3] + '()', icon: '·', line: i+1, depth: 1, children: [] });
+    }
+  });
+  // endLine = line before next sibling at same or lower depth, or end of file
+  for (let i = 0; i < items.length; i++) {
+    const next = items.slice(i+1).find(n => n.depth <= items[i].depth);
+    items[i].endLine = next ? next.line - 1 : lines.length;
+  }
+  return items;
+}
+
+function parsePy(lines) {
+  const items = [];
+  lines.forEach((raw, i) => {
+    let m = raw.match(/^(\s*)def\s+([\w_]+)\s*\(/);
+    if (m) { items.push({ label: 'def ' + m[2] + '()', icon: '⚡', line: i+1, depth: m[1].length > 0 ? 1 : 0, children: [] }); return; }
+    m = raw.match(/^(\s*)class\s+([\w_]+)/);
+    if (m) { items.push({ label: 'class ' + m[2], icon: '🔷', line: i+1, depth: 0, children: [] }); return; }
+    m = raw.match(/^(\s*)@([\w.]+)/);
+    if (m) { items.push({ label: '@' + m[2], icon: '📌', line: i+1, depth: m[1].length > 0 ? 1 : 0, children: [] }); }
+  });
+  for (let i = 0; i < items.length; i++) {
+    const next = items.slice(i+1).find(n => n.depth <= items[i].depth);
+    items[i].endLine = next ? next.line - 1 : lines.length;
+  }
+  return items;
+}
+
+function parseCss(lines) {
+  const items = [];
+  lines.forEach((raw, i) => {
+    const t = raw.trim();
+    if (!t || t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
+    if (/^@(media|keyframes|supports|layer)/.test(t)) { items.push({ label: t.replace(/\{.*$/, '').trim(), icon: '📐', line: i+1, depth: 0, children: [] }); return; }
+    if (t.endsWith('{')) { const sel = t.replace(/\{.*$/, '').trim(); if (sel) items.push({ label: sel, icon: '●', line: i+1, depth: 0, children: [] }); }
+  });
+  return items;
+}
+
+function parseJson(lines) {
+  const items = [];
+  lines.forEach((raw, i) => {
+    const m = raw.match(/^(\s*)"([\w$\-]+)"\s*:/);
+    if (!m) return;
+    const depth = Math.floor(m[1].length / 2);
+    if (depth < 2) items.push({ label: '"' + m[2] + '"', icon: depth === 0 ? '{}' : '·', line: i+1, depth: Math.min(depth, 1), children: [] });
+  });
+  return items;
+}
+
+function renderStructure(tree) {
+  const container = document.getElementById('struct-scroll');
+  if (!tree || !tree.length) { container.innerHTML = '<div id="struct-empty">No symbols found for this file type.</div>'; return; }
+  container.innerHTML = '';
+  function renderNodes(nodes, parentEl) {
+    nodes.forEach(node => {
+      const row = document.createElement('div');
+      row.className = 'st-node' + (node.depth === 0 ? ' st-top' : '');
+      const indent = document.createElement('span');
+      indent.className = 'st-indent'; indent.style.cssText = `width:${node.depth * 16 + 8}px;display:inline-block;flex-shrink:0`;
+      const tog = document.createElement('span'); tog.className = 'st-toggle';
+      if (node.children && node.children.length) tog.textContent = '▾';
+      const ico = document.createElement('span'); ico.className = 'st-icon'; ico.textContent = node.icon;
+      const lbl = document.createElement('span'); lbl.className = 'st-label'; lbl.textContent = node.label;
+      const ln  = document.createElement('span'); ln.className  = 'st-line';  ln.textContent  = node.line;
+      row.append(indent, tog, ico, lbl, ln);
+      parentEl.appendChild(row);
+      if (node.children && node.children.length) {
+        const childEl = document.createElement('div'); childEl.className = 'st-children';
+        parentEl.appendChild(childEl);
+        renderNodes(node.children, childEl);
+        tog.addEventListener('click', e => { e.stopPropagation(); const c = childEl.classList.toggle('collapsed'); tog.textContent = c ? '▸' : '▾'; });
+      }
+      row.addEventListener('click', () => {
+        closeStructure();
+        if (_ed) _ed.blur();
+        setTimeout(() => {
+          const startRow = node.line - 1;       // 0-based
+          const endRow   = node.endLine ? node.endLine - 1 : startRow;
+          // Highlight exactly the block: start line to end line
+          ed().selection.clearSelection();
+          ed().selection.setSelectionRange({
+            start: { row: startRow, column: 0 },
+            end:   { row: endRow,   column: ed().session.getLine(endRow).length }
+          });
+          // Pin start row to top of visible area
+          ed().renderer.scrollToRow(startRow);
+          ed().blur();
+        }, 290);
+      });
+    });
+  }
+  renderNodes(tree, container);
+}
+// ─────────────────────────────────────────────────────────────────────────
 function togSnip() { snipOn = !snipOn; document.getElementById('snip-tog').style.color = snipOn ? '' : 'var(--ac)'; lay(); }
 
 // ── Magic Paste Engine ─────────────────────────────────────────────────────
@@ -1386,9 +1739,115 @@ function toastUndo(msg, type) {
   toastT = setTimeout(() => { el.className = ''; }, 5000); // longer window for undo
 }
 
+// ── Phase 2.1: Runtime Error Toast ────────────────────────────────────────
+let errToastT;
+
+function showErrToast(detail) {
+  const el    = document.getElementById('err-toast');
+  const msgEl = document.getElementById('err-toast-msg');
+  msgEl.textContent = '⚠️ ' + detail;
+  el.classList.add('on');
+  // Position the error toast just above the regular toast slot
+  const floatBase = parseInt(document.getElementById('toast').style.bottom || '0', 10);
+  el.style.bottom = (floatBase + 44) + 'px';
+  clearTimeout(errToastT);
+  // No auto-dismiss — stays until user acts or dismisses manually
+}
+
+function dismissErrToast() {
+  document.getElementById('err-toast').classList.remove('on');
+  clearTimeout(errToastT);
+}
+
+function autoFixError() {
+  if (!lastIframeError) return;
+  dismissErrToast();
+
+  // ── Build a rich context block for the AI ────────────────────────────────
+  // Parse line number out of the stored error string (format: "msg (L42:5)")
+  const lineMatch = lastIframeError.match(/\(L(\d+)(?::\d+)?\)/);
+  const errLine   = lineMatch ? parseInt(lineMatch[1], 10) : 0;   // 1-based
+  const fileName  = curFile || 'index.html';
+  const source    = ed().getValue();
+  const allLines  = source.split('\n');
+  const total     = allLines.length;
+
+  let contextSnippet = '';
+  if (errLine > 0 && errLine <= total) {
+    // Grab ±15 lines around the error, label each with its real line number
+    const from = Math.max(0, errLine - 16);        // 0-based
+    const to   = Math.min(total - 1, errLine + 14); // 0-based
+    const snippet = allLines.slice(from, to + 1)
+      .map((l, i) => {
+        const lineNo = from + i + 1;                // back to 1-based
+        const marker = lineNo === errLine ? '>>>' : '   ';
+        return `${marker} ${String(lineNo).padStart(4)} | ${l}`;
+      }).join('\n');
+    contextSnippet = `\n\nRelevant source (${fileName}, around line ${errLine}):\n\`\`\`\n${snippet}\n\`\`\``;
+  }
+
+  const fileSize  = total + ' lines';
+  const prompt =
+`Runtime error in ${fileName} (${fileSize}):
+
+  ${lastIframeError}
+${contextSnippet}
+
+Identify the exact bug and return the fully corrected file. Do not truncate or use placeholders.`;
+
+  const inp = document.getElementById('ai-inp');
+  inp.value = prompt;
+  document.getElementById('ai-inc').checked = true;
+  openAI();
+  setTimeout(() => sendAI(), 350);
+}
+// ──────────────────────────────────────────────────────────────────────────
+
 function isWebProj() { return Object.keys(activeFiles()).some(n => /\.(html?|css|js|json)$/i.test(n)); }
 function findEntry() { const names = Object.keys(activeFiles()); return names.find(n => n === 'index.html') || names.find(n => /\.html?$/i.test(n)) || null; }
-function bundleProject() { const files = activeFiles(); if (curFile) files[curFile] = { ...(files[curFile] || {}), content: ed().getValue() }; const entry = findEntry(); if (!entry) return null; let html = files[entry]?.content || ''; const filesMap = {}; Object.keys(files).forEach(n => { filesMap[n] = files[n]?.content || ''; }); const inject = `\u003cscript>window.__files__=${JSON.stringify(filesMap)};<\/script>`; html = html.replace(/<link[^>]+rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*\/?>/gi, (m, href) => { const fn = href.replace(/^\.\//, ''); const css = files[fn]?.content; return css === undefined ? m : `<style>/* ${fn} */\n${css}</style>`; }); html = html.replace(/<script([^>]*)\ssrc=["']([^"']+)["']([^>]*)><\/script>/gi, (m, pre, src, post) => { const fn = src.replace(/^\.\//, ''); const js = files[fn]?.content; return js === undefined ? m : `<script${pre}${post}>/* ${fn} */\n${js}<\/script>`; }); if (/<\/head>/i.test(html)) html = html.replace(/<\/head>/i, inject + '\n</head>'); else if (/<body/i.test(html)) html = html.replace(/<body([^>]*)>/i, `<body$1>\n${inject}`); else html = inject + html; return html; }
+function bundleProject() {
+  const files = activeFiles();
+  if (curFile) files[curFile] = { ...(files[curFile] || {}), content: ed().getValue() };
+  const entry = findEntry(); if (!entry) return null;
+  let html = files[entry]?.content || '';
+  const filesMap = {};
+  Object.keys(files).forEach(n => { filesMap[n] = files[n]?.content || ''; });
+  const inject = `\u003cscript>window.__files__=${JSON.stringify(filesMap)};<\/script>`;
+
+  // ── Phase 2.1: Error Interceptor ──────────────────────────────────────────
+  // Injected at the very top of <head> so it catches errors from any later script.
+  const errGuard = `\u003cscript>
+(function(){
+  function _ppSend(msg,line,col){
+    try{ window.parent.postMessage({type:'pp-error',msg:String(msg),line:line||0,col:col||0},'*'); }catch(e){}
+  }
+  window.onerror = function(msg,src,line,col,err){
+    _ppSend(err ? (err.message||msg) : msg, line, col);
+    return false;
+  };
+  window.onunhandledrejection = function(ev){
+    var r = ev.reason;
+    _ppSend(r ? (r.message || String(r)) : 'Unhandled Promise Rejection', 0, 0);
+  };
+})();
+<\/script>`;
+  // ──────────────────────────────────────────────────────────────────────────
+
+  html = html.replace(/<link[^>]+rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*\/?>/gi, (m, href) => { const fn = href.replace(/^\.\//, ''); const css = files[fn]?.content; return css === undefined ? m : `<style>/* ${fn} */\n${css}</style>`; });
+  html = html.replace(/<script([^>]*)\ssrc=["']([^"']+)["']([^>]*)><\/script>/gi, (m, pre, src, post) => { const fn = src.replace(/^\.\//, ''); const js = files[fn]?.content; return js === undefined ? m : `<script${pre}${post}>/* ${fn} */\n${js}<\/script>`; });
+
+  // Inject filesMap near </head>, and errGuard at the absolute top of <head>
+  if (/<\/head>/i.test(html)) {
+    html = html.replace(/<\/head>/i, inject + '\n</head>');
+    html = html.replace(/<head([^>]*)>/i, `<head$1>\n${errGuard}`);
+  } else if (/<body/i.test(html)) {
+    html = html.replace(/<body([^>]*)>/i, `<body$1>\n${inject}`);
+    html = errGuard + html;
+  } else {
+    html = errGuard + inject + html;
+  }
+  return html;
+}
 async function runCode() { const code = ed().getValue().trim(); clrOut(); setOutH(Math.round(window.innerHeight * .42)); if (isWebProj()) { const entry = findEntry(); if (entry) { curHtml = bundleProject(); document.getElementById('pframe').style.display = 'block'; document.getElementById('pre').style.display = 'none'; document.getElementById('pframe').srcdoc = curHtml; document.getElementById('out-lbl').textContent = 'PREVIEW'; document.getElementById('btn-tab').style.display = 'inline-block'; return; } if (!/\.py$/i.test(curFile || '')) { document.getElementById('pframe').style.display = 'none'; document.getElementById('pre').style.display = 'block'; document.getElementById('out-lbl').textContent = 'OUTPUT'; aout('No index.html found.', 'ow'); return; } } if (/^<!doctype|^<html/i.test(code)) { curHtml = code; document.getElementById('pframe').style.display = 'block'; document.getElementById('pre').style.display = 'none'; document.getElementById('pframe').srcdoc = code; document.getElementById('out-lbl').textContent = 'PREVIEW'; document.getElementById('btn-tab').style.display = 'inline-block'; return; } document.getElementById('pframe').style.display = 'none'; document.getElementById('pre').style.display = 'block'; document.getElementById('out-lbl').textContent = 'OUTPUT'; document.getElementById('btn-tab').style.display = 'none'; aout('Loading Python…', 'os'); const ok = await ensurePyo(); if (!ok) return; aout('Running…', 'os'); lastErr = ''; await runPy(code); if (lastErr) { document.getElementById('btn-err').style.display = 'inline-block'; document.getElementById('btn-ai').style.display = 'inline-block'; } }
 async function ensurePyo() { if (pyo) return true; if (pyLd) { aout('Still loading…', 'os'); return false; } if (!navigator.onLine && typeof loadPyodide === 'undefined') { aout('Offline: Cannot download Pyodide.', 'oe'); return false; } pyLd = true; const btn = document.getElementById('run-btn'); btn.classList.add('busy'); btn.innerHTML = '… LOAD'; try { await new Promise((res, rej) => { if (typeof loadPyodide !== 'undefined') { res(); return; } const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js'; s.onload = res; s.onerror = () => rej(new Error('Failed')); document.head.appendChild(s); }); pyo = await loadPyodide(); pyo.setStdout({ batched: m => aout(m, '') }); pyo.setStderr({ batched: m => { lastErr += m + '\n'; aout(m, 'oe'); } }); } catch(e) { aout('Python engine failed.', 'oe'); btn.classList.remove('busy'); btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> RUN'; pyLd = false; return false; } btn.classList.remove('busy'); btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> RUN'; pyLd = false; return true; }
 async function runPy(code) { try { await pyo.loadPackagesFromImports(code); await pyo.runPythonAsync(code); } catch(err) { lastErr += String(err) + '\n'; aout(String(err), 'oe'); } }
@@ -1435,8 +1894,23 @@ async function sendAI() {
   const inp = document.getElementById('ai-inp'); const txt = inp.value.trim(); if (!txt) return;
   const key = aiProv === 'gem' ? cfg.gkey : cfg.ckey; if (!key) return toast(`Add key in Settings`, 'bad');
   addMsg(txt, 'usr'); inp.value = ''; inp.disabled = true;
-  let prompt = 'Provide clean code.\n\nRequest: ' + txt;
-  if (document.getElementById('ai-inc').checked && ed().getValue().trim()) prompt += '\n\nFile (' + (curFile||'untitled') + '):\n\x60\x60\x60\n' + ed().getValue() + '\n\x60\x60\x60';
+
+  // Detect auto-fix mode vs normal mode — changes the system framing
+  const isAutoFix = !!lastIframeError && txt.startsWith('Runtime error in ');
+  const sysPrefix = isAutoFix
+    ? 'You are a code debugger. The user is on mobile with no DevTools. ' +
+      'You MUST return the ENTIRE corrected file — no truncation, no placeholders like "// rest of code". ' +
+      'Output only the fixed code, no explanation before or after it.\n\n'
+    : 'Provide clean code.\n\n';
+
+  let prompt = sysPrefix + 'Request: ' + txt;
+  if (document.getElementById('ai-inc').checked && ed().getValue().trim()) {
+    prompt += '\n\nFile (' + (curFile||'untitled') + '):\n\x60\x60\x60\n' + ed().getValue() + '\n\x60\x60\x60';
+  }
+
+  // After auto-fix fires, clear the stored error so next sendAI is normal mode
+  if (isAutoFix) lastIframeError = '';
+
   try {
     const reply = aiProv === 'gem' ? await callGem(prompt) : await callCla(prompt);
     const clean = reply.replace(/\x60\x60\x60[\w]*\n?/g, '').replace(/\x60\x60\x60/g, '').trim();
