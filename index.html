@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="PixelPad">
 <link rel="manifest" href="./manifest.json">
-<title>pixelpadv6.7.1</title>
+<title>pixelpadv6.7.2</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.js"></script>
 <style>
@@ -452,6 +452,8 @@ input, select, textarea { font-family: var(--mono); }
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L13.6 9.4L21 12L13.6 14.6L12 22L10.4 14.6L3 12L10.4 9.4Z"/></svg>AI</button>
       <button class="t-btn" onclick="openSettings()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
+      <button class="t-btn" onclick="repairWorkspace()" style="color:var(--wa);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Repair</button>
     </div>
 
   </div>
@@ -808,11 +810,63 @@ function loadWorkspace() {
   });
   
   if (!W.activeProject) W.activeProject = 'Default';
+  const fixed = sanitiseWorkspace();
+  if (fixed > 0) { console.warn(`[PixelPad] Repaired ${fixed} double-encoded file(s) in workspace`); }
   saveWorkspace();
 }
 
 function saveWorkspace() {
   try { localStorage.setItem('pp_w', JSON.stringify(W)); } catch(e) { toast('Storage full', 'bad'); }
+}
+
+// Detect and unwrap double-stringified file content.
+// Symptoms: content starts with a quote char and parses as a JSON string
+// whose value looks like HTML/JS (starts with <, //, etc.)
+function sanitiseContent(content) {
+  if (typeof content !== 'string') return content;
+  // Double-stringified: the whole content is a JSON-encoded string literal
+  if ((content.startsWith('"') && content.endsWith('"')) ||
+      (content.startsWith("'") && content.endsWith("'"))) {
+    try {
+      const inner = JSON.parse(content);
+      if (typeof inner === 'string' && inner.length > 0) {
+        // Only unwrap if inner looks like actual code, not a simple string value
+        if (/^[\s\S]*(<[a-zA-Z]|function |const |let |var |import |class |def |#)/.test(inner.trimStart())) {
+          return inner;
+        }
+      }
+    } catch(e) {}
+  }
+  return content;
+}
+
+function sanitiseWorkspace() {
+  let fixed = 0;
+  Object.values(W.projects || {}).forEach(proj => {
+    Object.keys(proj.files || {}).forEach(fname => {
+      const f = proj.files[fname];
+      if (f && typeof f.content === 'string') {
+        const clean = sanitiseContent(f.content);
+        if (clean !== f.content) { f.content = clean; fixed++; }
+      }
+    });
+  });
+  return fixed;
+}
+
+function repairWorkspace() {
+  const fixed = sanitiseWorkspace();
+  saveWorkspace();
+  if (fixed > 0) {
+    // Reload current file if it was one of the repaired ones
+    if (curFile) {
+      const p = activeProj();
+      if (p && p.files[curFile]) { ed().setValue(p.files[curFile].content || '', -1); }
+    }
+    toast(`Repaired ${fixed} file${fixed > 1 ? 's' : ''} \u2014 try Run again`, 'ok');
+  } else {
+    toast('No encoding issues found', '');
+  }
 }
 
 function activeProj() { return W.projects[W.activeProject] || null; }
@@ -980,7 +1034,7 @@ async function deleteProj(name, e) {
 
   // Check if this project is synced to GitHub — offer to delete there too
   const proj = W.projects[name];
-  const isSynced = proj && proj.ghRepo;
+  const isSynced = proj && proj.isSynced;
   if (isSynced && cfg.ghtoken) {
     if (confirm(`Also delete the GitHub repo "${name}"?\n\nThis is permanent and cannot be undone.`)) {
       try {
@@ -1906,6 +1960,13 @@ function bundleProject() {
   const files = activeFiles();
   if (curFile) files[curFile] = { ...(files[curFile] || {}), content: ed().getValue() };
   const entry = findEntry(); if (!entry) return null;
+  // Sanitise all file content before bundling — prevents double-encoded strings
+  // from appearing as escaped JSON in the preview instead of raw HTML/JS
+  Object.keys(files).forEach(n => {
+    if (files[n] && typeof files[n].content === 'string') {
+      files[n].content = sanitiseContent(files[n].content);
+    }
+  });
   let html = files[entry]?.content || '';
   const filesMap = {};
   Object.keys(files).forEach(n => { filesMap[n] = files[n]?.content || ''; });
