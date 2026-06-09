@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tilly's Meal Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a; --surface: #141414; --surface2: #1c1c1c;
+    --border: rgba(255,255,255,0.08); --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.15); --text: #e2e8f0;
+    --text-muted: #64748b; --green: #34d399; --red: #f87171; --blue: #60a5fa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; min-height: 100vh; padding: 24px 16px 80px; }
+  .max-w { max-width: 480px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 32px; padding-top: 8px; }
+  .header h1 { font-family: 'Playfair Display', serif; font-size: clamp(2rem,8vw,2.6rem); color: var(--amber); letter-spacing: -0.5px; line-height: 1.1; }
+  .header p { color: var(--text-muted); margin-top: 6px; font-size: 13px; }
+  .card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 18px; padding: 20px; margin-bottom: 16px; backdrop-filter: blur(12px); }
+  .section-label { font-size: 11px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; }
+  .api-row { display: flex; gap: 8px; align-items: stretch; }
+  .api-row input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 10px 14px; font-family: 'DM Sans', sans-serif; font-size: 13px; }
+  .api-row input:focus { outline: none; border-color: var(--amber); }
+  .api-save { background: var(--amber-dim); border: 1px solid var(--amber); color: var(--amber); border-radius: 10px; padding: 10px 14px; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .api-save:hover { background: var(--amber); color: #000; }
+  .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .profile-input { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 10px 12px; font-family: 'DM Sans', sans-serif; font-size: 13px; width: 100%; }
+  .profile-input:focus { outline: none; border-color: var(--amber); }
+  .upload-zone { border: 2px dashed var(--border); border-radius: 14px; padding: 28px 20px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--amber); background: var(--amber-dim); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-zone .icon { font-size: 2rem; margin-bottom: 8px; }
+  .upload-zone p { color: var(--text-muted); font-size: 13px; }
+  .upload-zone .preview { max-width: 100%; border-radius: 10px; margin-top: 12px; max-height: 180px; object-fit: cover; }
+  label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+  input[type=range] { width: 100%; accent-color: var(--amber); cursor: pointer; }
+  .range-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 12px 14px; font-family: 'DM Sans', sans-serif; font-size: 14px; resize: vertical; min-height: 70px; }
+  textarea:focus { outline: none; border-color: var(--amber); }
+  .tag-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); font-size: 12px; font-weight: 500; cursor: pointer; user-select: none; transition: all 0.15s; background: var(--surface2); }
+  .tag.active { background: var(--amber); color: #000; border-color: var(--amber); }
+  .btn-primary { width: 100%; background: var(--amber); color: #000; border: none; border-radius: 14px; padding: 16px; font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: opacity 0.2s, transform 0.1s; letter-spacing: 0.3px; margin-bottom: 8px; }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .loader { text-align: center; padding: 40px 20px; }
+  .loader .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--amber); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader p { color: var(--text-muted); font-size: 13px; }
+  
+  .swipe-wrapper { position: relative; margin-bottom: 14px; border-radius: 18px; background: var(--amber); }
+  .swipe-wrapper.animate { animation: cardIn 0.35s ease both; }
+  .swipe-wrapper.swapping { opacity: 0.45; pointer-events: none; }
+  .swipe-action { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; display: flex; align-items: center; justify-content: center; flex-direction: column; color: #000; font-weight: bold; font-size: 13px; cursor: pointer; border-radius: 0 18px 18px 0; }
+  
+  .meal-card { position: relative; z-index: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; margin-bottom: 0; transition: transform 0.2s cubic-bezier(0.1, 0.7, 0.1, 1), border-color 0.2s; }
+  .meal-card:hover { border-color: rgba(255,255,255,0.15); }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  
+  .meal-card-body { padding: 18px 18px 16px; }
+  .meal-hero { width: 100%; height: 180px; object-fit: cover; display: block; border-radius: 0; background: linear-gradient(135deg,#1c1c1c 0%,#2a2010 50%,#1c1410 100%); }
+  .meal-hero-skeleton { width: 100%; height: 180px; background: linear-gradient(90deg,#1c1c1c 25%,#252525 50%,#1c1c1c 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .meal-hero-wrap { position: relative; overflow: hidden; border-radius: 17px 17px 0 0; }
+  .meal-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .meal-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: #fff; line-height: 1.3; flex: 1; }
+  .meal-title a { color: inherit; text-decoration: none; }
+  .meal-title a:hover { color: var(--amber); }
+  .card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .swap-btn, .fav-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+  .swap-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .swap-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .fav-btn { font-size: 15px; padding: 6px 8px; }
+  .fav-btn.active { border-color: var(--red); color: var(--red); background: rgba(248,113,113,0.1); }
+  .fav-btn:hover { border-color: var(--red); color: var(--red); }
+  .meal-desc { color: var(--text-muted); font-size: 13px; margin: 8px 0 10px; line-height: 1.5; }
+  
+  .day-selector { display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .day-selector::-webkit-scrollbar { display: none; }
+  .day-pill { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 12px; padding: 4px 10px; font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
+  .day-pill.active { background: var(--amber-dim); color: var(--amber); border-color: var(--amber); }
+  
+  .badge-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; align-items: center; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; padding: 3px 9px; font-size: 11px; font-weight: 500; }
+  .badge-macros { background: var(--amber-dim); color: var(--amber); }
+  .badge-time { background: rgba(96,165,250,0.12); color: var(--blue); }
+  .badge-easy { background: rgba(52,211,153,0.12); color: var(--green); }
+  .badge-medium { background: rgba(245,158,11,0.12); color: var(--amber); }
+  .badge-hard { background: rgba(248,113,113,0.12); color: var(--red); }
+  .badge-cost { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+  
+  .ingredients-label { font-size: 10px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin: 10px 0 6px; }
+  .ing-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .ing-have   { background: rgba(52,211,153,0.1);  color: var(--green); border-radius: 6px; padding: 3px 8px; font-size: 11px; border: 1px solid rgba(52,211,153,0.2); }
+  .ing-pantry { background: rgba(245,158,11,0.12); color: var(--amber); border-radius: 6px; padding: 3px 8px; font-size: 11px; border: 1px solid rgba(245,158,11,0.2); }
+  .ing-need { background: rgba(248,113,113,0.1); color: var(--red); border-radius: 6px; padding: 3px 8px; font-size: 11px; border: 1px solid rgba(248,113,113,0.2); }
+  .swap-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.2); border-top-color: var(--amber); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; vertical-align: middle; }
+  
+  .shop-section { margin-bottom: 20px; }
+  .shop-category { font-size: 11px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; color: var(--amber); margin-bottom: 10px; }
+  .shop-item { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .shop-item:last-child { border-bottom: none; }
+  .shop-item input[type=checkbox] { accent-color: var(--amber); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+  .shop-item label { font-size: 14px; cursor: pointer; flex: 1; user-select: none; }
+  .shop-item input:checked + label { text-decoration: line-through; color: var(--text-muted); }
+  .shop-cost { padding: 16px 0 0; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; color: var(--amber); font-weight: 700; font-size: 15px; margin-top: 10px; }
+  .shop-cost-sub { font-size: 12px; font-weight: 400; color: var(--text-muted); margin-left: 8px; }
+  
+  .download-btn { display: block; width: 100%; background: linear-gradient(135deg,#d97706,#f59e0b); color: #000; border: none; border-radius: 14px; padding: 16px; font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; text-align: center; cursor: pointer; text-decoration: none; margin-top: 8px; transition: opacity 0.2s; }
+  .download-btn:hover { opacity: 0.85; }
+  .download-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .modal-overlay.show { opacity: 1; pointer-events: all; }
+  .modal { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 28px 24px; max-width: 320px; width: 100%; transform: translateY(20px); transition: transform 0.2s; }
+  .modal-overlay.show .modal { transform: translateY(0); }
+  .modal h3 { font-family: 'Playfair Display', serif; font-size: 1.2rem; margin-bottom: 10px; }
+  .modal p { color: var(--text-muted); font-size: 13px; line-height: 1.5; margin-bottom: 20px; }
+  .modal-btns { display: flex; gap: 10px; }
+  .modal-btns button { flex: 1; padding: 12px; border-radius: 10px; font-size: 14px; cursor: pointer; font-weight: 500; transition: opacity 0.15s; }
+  .modal-btns button:hover { opacity: 0.85; }
+  .modal-cancel { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  .modal-confirm { background: var(--amber); border: none; color: #000; }
+  
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px; font-size: 13px; transition: transform 0.3s; z-index: 999; display: flex; align-items: center; gap: 12px; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast-undo { background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; font-family: 'DM Sans', sans-serif; }
+  
+  .error-box { background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.3); border-radius: 12px; padding: 14px 16px; color: var(--red); font-size: 13px; margin-bottom: 16px; }
+  .section-title { font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--amber); margin: 32px 0 16px; }
+  .hidden { display: none !important; }
+
+  @media (max-width: 480px) {
+    .hide-on-mobile { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="max-w">
+
+  <div class="header">
+    <h1>&#10022; Meal Planner</h1>
+    <p>Powered by Gemini &middot; RecipeTin Eats inspired</p>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Gemini API Key</div>
+    <div class="api-row">
+      <input type="password" id="apiKey" placeholder="AIza&hellip;" autocomplete="off">
+      <button class="api-save" onclick="saveKey()">Save</button>
+    </div>
+    <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">Stored in localStorage only. <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--amber);">Get a key &rarr;</a></p>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Family Profile</div>
+    <div class="profile-grid">
+      <div><label>Family name</label><input class="profile-input" id="familyName" placeholder="e.g. The Smiths" oninput="saveProfile()"></div>
+      <div><label>No. of kids</label><input class="profile-input" id="numKids" type="number" min="0" max="10" placeholder="e.g. 2" oninput="saveProfile()"></div>
+    </div>
+    <label style="margin-top:4px;">Allergies / dislikes (always excluded)</label>
+    <textarea id="allergyText" placeholder="e.g. no mushrooms, nut allergy, kids hate capsicum&hellip;" rows="2" oninput="saveProfile()" style="margin-top:4px;"></textarea>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Fridge / Pantry Photo</div>
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="photoInput" accept="image/*" capture="environment" onchange="handlePhoto(this)">
+      <div id="uploadPlaceholder"><div class="icon">&#128248;</div><p>Tap to take a photo or upload</p></div>
+      <img id="photoPreview" class="preview hidden" alt="Fridge photo">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Plan Settings</div>
+    <label>Meals this week: <strong id="mealCountLabel">5</strong></label>
+    <input type="range" id="mealCount" min="1" max="7" value="5" oninput="document.getElementById('mealCountLabel').textContent=this.value">
+    <div class="range-row"><span>1</span><span>7</span></div>
+    <div style="margin-top:18px;">
+      <label style="margin-bottom:10px;">Focus goals</label>
+      <div class="tag-row" id="focusTags">
+        <div class="tag" data-val="High Protein" onclick="toggleTag(this)">&#128170; High Protein</div>
+        <div class="tag" data-val="High Iron" onclick="toggleTag(this)">&#129753; High Iron</div>
+        <div class="tag" data-val="Hidden Veggies" onclick="toggleTag(this)">&#129382; Hidden Veggies</div>
+        <div class="tag" data-val="Quick 20-min" onclick="toggleTag(this)">&#9889; Quick 20-min</div>
+      </div>
+    </div>
+    <div style="margin-top:18px;">
+      <label>What's hiding in the back of the fridge?</label>
+      <textarea id="fridgeText" placeholder="e.g. half a block of feta, some wilting spinach, leftover rice&hellip;" rows="3"></textarea>
+    </div>
+  </div>
+
+  <button class="btn-primary" id="generateBtn" onclick="confirmGenerate()">&#10022; Generate This Week's Plan</button>
+  <div class="error-box hidden" id="errorBox"></div>
+  <div class="loader hidden" id="loader"><div class="spinner"></div><p id="loaderMsg">Consulting the culinary architect&hellip;</p></div>
+
+  <div id="results" class="hidden">
+    <h2 class="section-title">This Week's Menu</h2>
+    
+    <div id="favSummaryWrapper" class="hidden" style="margin-bottom:16px;">
+      <div class="card" style="margin-bottom:0; display:flex; justify-content:space-between; align-items:center; padding:12px 20px;">
+        <div style="font-size:13px;"><span style="color:var(--red);font-size:15px;margin-right:6px;">\u2665</span> <strong id="favCountText">0</strong> favourites saved</div>
+        <button class="toast-undo" style="border:1px solid var(--border);color:var(--text-muted);" onclick="clearFavourites()">Clear all</button>
+      </div>
+    </div>
+
+    <div id="mealCards"></div>
+    <h2 class="section-title">Woolworths List</h2>
+    <div class="card" id="shoppingList"></div>
+    <button class="download-btn" id="downloadBtn" onclick="downloadHTML()">&#8595; Download Grocery List</button>
+  </div>
+
+</div>
+
+<div class="toast" id="toast">
+  <span id="toastMsg"></span>
+  <button class="toast-undo hidden" id="toastUndo" onclick="undoSwap()">Undo</button>
+</div>
+
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <h3>Regenerate plan?</h3>
+    <p>This will replace your current meal plan and shopping list. Any swaps you've made will be lost.</p>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal()">Keep current</button>
+      <button class="modal-confirm" onclick="closeModal(); generatePlan()">Regenerate</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ────────────────────────────────────────────────────
+var state = {
+  plan: null,
+  photoB64: null,
+  photoMime: 'image/jpeg',
+  swapInProgress: false,
+  undoMeal: null,
+  favourites: new Set(),
+  history: [],
+  blacklist: [],
+  currentGenId: null
+};
+
+var AISLE_ORDER = ['Fresh Produce','Meat & Seafood','Dairy & Eggs','Deli & Bakery','Pantry & Aisle','Frozen'];
+var DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+// ── SCHEMAS ──────────────────────────────────────────────────
+var MEAL_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    id:                   { type: 'STRING' },
+    title:                { type: 'STRING' },
+    recipetin_search_url: { type: 'STRING' },
+    description:          { type: 'STRING' },
+    ingredients: {
+      type: 'OBJECT',
+      properties: {
+        have:   { type: 'ARRAY', items: { type: 'STRING' } },
+        pantry: { type: 'ARRAY', items: { type: 'STRING' } },
+        need:   { type: 'ARRAY', items: { type: 'STRING' } }
+      },
+      required: ['have','pantry','need']
+    },
+    macros:               { type: 'STRING' },
+    prep_time:            { type: 'STRING' },
+    difficulty:           { type: 'STRING' },
+    estimated_cost_aud:   { type: 'STRING' },
+    estimated_cost_per_person_aud: { type: 'STRING' },
+    image_search_keywords:{ type: 'STRING' }
+  },
+  required: ['id','title','recipetin_search_url','description','ingredients','macros','prep_time','difficulty','estimated_cost_aud','estimated_cost_per_person_aud']
+};
+
+var SHOPPING_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    'Fresh Produce':  { type: 'ARRAY', items: { type: 'STRING' } },
+    'Meat & Seafood': { type: 'ARRAY', items: { type: 'STRING' } },
+    'Dairy & Eggs':   { type: 'ARRAY', items: { type: 'STRING' } },
+    'Deli & Bakery':  { type: 'ARRAY', items: { type: 'STRING' } },
+    'Pantry & Aisle': { type: 'ARRAY', items: { type: 'STRING' } },
+    'Frozen':         { type: 'ARRAY', items: { type: 'STRING' } }
+  },
+  required: ['Fresh Produce','Meat & Seafood','Dairy & Eggs','Deli & Bakery','Pantry & Aisle','Frozen']
+};
+
+var FULL_SCHEMA = {
+  type: 'OBJECT',
+  properties: { meals: { type: 'ARRAY', items: MEAL_SCHEMA }, shopping_list: SHOPPING_SCHEMA },
+  required: ['meals','shopping_list']
+};
+
+// ── PROMPTS ──────────────────────────────────────────────────
+function buildFullPrompt() {
+  return 'You are a premium culinary architect designing a weekly meal plan for a family of four.\n'
+    + 'Analyze the user\'s fridge/pantry image and dietary constraints.\n'
+    + 'CRITICAL INSTRUCTION: If the user provides "Focus" goals (e.g., High Iron) AND fridge items/photo, you MUST strongly prioritise using the fridge items to meet those focus goals. Do NOT discard or ignore the user\'s fridge ingredients in favor of standard focus recipes.\n'
+    + 'Recommend recipes heavily inspired by the Australian food blog RecipeTin Eats by Nagi Maehashi.\n'
+    + 'Only recommend recipes that genuinely exist on recipetineats.com.\n'
+    + 'Construct recipetin_search_url as: https://www.google.com/search?q=site:recipetineats.com+[hyphenated-recipe-name]\n'
+    + 'For prep_time use a short string like "20 mins" or "1 hr".\n'
+    + 'For difficulty use exactly one of: Easy, Medium, Hard.\n'
+    + 'For estimated_cost_aud provide a short string estimating the TOTAL cost of the ingredients for the meal in AUD (e.g. "~$18").\n'
+    + 'For estimated_cost_per_person_aud provide a short string estimating the cost PER PERSON in AUD (e.g. "~$4.50").\n'
+    + 'For ingredients, classify every single ingredient into EXACTLY ONE of these three arrays:\n'
+    + '  have: items EXPLICITLY seen in the fridge photo or listed in the fridge text. If no fridge context is provided, this MUST be an empty array.\n'
+    + '  pantry: standard pantry items (butter, water, soy sauce, flour, standard spices, oil, etc.) NOT seen in the fridge.\n'
+    + '  need: non-standard items (pasta, meat, fresh produce, specific dairy, etc.) that must be purchased at the store.\n'
+    + 'Return a full meal plan with meals array and a categorised shopping_list object.';
+}
+
+var SWAP_PROMPT = 'You are a culinary expert specialising in RecipeTin Eats recipes by Nagi Maehashi.\n'
+  + 'Suggest a single replacement meal as a JSON object.\n'
+  + 'Only recommend recipes that genuinely exist on recipetineats.com.\n'
+  + 'Construct recipetin_search_url as: https://www.google.com/search?q=site:recipetineats.com+[hyphenated-recipe-name]\n'
+  + 'For prep_time use a short string like "20 mins". For difficulty use exactly one of: Easy, Medium, Hard.\n'
+  + 'For estimated_cost_aud provide a short string estimating the TOTAL cost in AUD (e.g. "~$18").\n'
+  + 'For estimated_cost_per_person_aud provide a short string estimating the cost PER PERSON in AUD (e.g. "~$4.50").\n'
+  + 'For ingredients, classify every ingredient into exactly three arrays:\n'
+  + '  have: items explicitly seen in the fridge photo or listed in fridge text.\n'
+  + '  pantry: standard pantry items (butter, water, soy sauce, spices, etc.).\n'
+  + '  need: non-standard items (pasta, meat, produce, etc.) that must be purchased.\n'
+  + 'Every ingredient must appear in exactly one array.\n'
+  + 'Return ONLY a single flat JSON meal object.';
+
+var SHOPPING_PROMPT = 'You are a meal planning assistant.\n'
+  + 'Given a list of meal titles, generate a consolidated Woolworths shopping list in exactly these sections:\n'
+  + 'Fresh Produce, Meat & Seafood, Dairy & Eggs, Deli & Bakery, Pantry & Aisle, Frozen.\n'
+  + 'Return ONLY the JSON shopping list object.';
+
+// ── HELPERS ──────────────────────────────────────────────────
+function escH(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function checkboxKey(cat, item) {
+  return 'grocery_' + (cat+'_'+item).toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,80);
+}
+
+function diffClass(d) {
+  const v = (d||'').toLowerCase();
+  return v==='easy' ? 'badge-easy' : v==='hard' ? 'badge-hard' : 'badge-medium';
+}
+
+function hasFridgeContext() {
+  return !!(state.photoB64 || document.getElementById('fridgeText').value.trim());
+}
+
+function getRecipeUrl(meal) {
+  return meal.recipetin_search_url || '';
+}
+
+function getFamilyHeadcount() {
+  const kids = parseInt(getProfile().kids) || 2;
+  return kids + 2; // Rough baseline assumption: 2 adults + kids
+}
+
+// ── PROFILE & HISTORY ────────────────────────────────────────
+function saveProfile() {
+  localStorage.setItem('mp_family', JSON.stringify({
+    name: document.getElementById('familyName').value,
+    kids: document.getElementById('numKids').value,
+    allergies: document.getElementById('allergyText').value
+  }));
+}
+function loadProfile() {
+  const p = JSON.parse(localStorage.getItem('mp_family')||'{}');
+  if (p.name) document.getElementById('familyName').value = p.name;
+  if (p.kids) document.getElementById('numKids').value = p.kids;
+  if (p.allergies) document.getElementById('allergyText').value = p.allergies;
+}
+function getProfile() { return JSON.parse(localStorage.getItem('mp_family')||'{}'); }
+
+function loadHistory() {
+  state.history = JSON.parse(localStorage.getItem('mp_history')||'[]');
+  state.blacklist = JSON.parse(localStorage.getItem('mp_blacklist')||'[]');
+}
+function saveHistory() {
+  localStorage.setItem('mp_history', JSON.stringify(state.history));
+  localStorage.setItem('mp_blacklist', JSON.stringify(state.blacklist));
+}
+
+// ── FAVOURITES ───────────────────────────────────────────────
+function loadFavourites() {
+  state.favourites = new Set(JSON.parse(localStorage.getItem('mp_fav_titles')||'[]'));
+  updateFavSummary();
+}
+function saveFavourites() {
+  localStorage.setItem('mp_fav_titles', JSON.stringify([...state.favourites]));
+}
+function updateFavSummary() {
+  const wrap = document.getElementById('favSummaryWrapper');
+  if (state.favourites.size > 0) {
+    wrap.classList.remove('hidden');
+    document.getElementById('favCountText').textContent = state.favourites.size;
+  } else {
+    wrap.classList.add('hidden');
+  }
+}
+function toggleFavourite(id, title) {
+  if (state.favourites.has(title)) { 
+    state.favourites.delete(title); 
+    toast('Removed from favourites',''); 
+  } else { 
+    state.favourites.add(title); 
+    toast('Added to favourites','success'); 
+  }
+  saveFavourites();
+  updateFavSummary();
+  const btn = document.querySelector('[data-fav="'+id+'"]');
+  if (btn) btn.classList.toggle('active', state.favourites.has(title));
+}
+function clearFavourites() {
+  if (confirm('Clear all saved favourites?')) {
+    state.favourites.clear();
+    saveFavourites();
+    updateFavSummary();
+    renderMealCards(false);
+  }
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const k = localStorage.getItem('gemini_key');
+  if (k) document.getElementById('apiKey').value = k;
+  loadProfile();
+  loadHistory();
+  loadFavourites();
+});
+
+function saveKey() {
+  const k = document.getElementById('apiKey').value.trim();
+  if (!k) return;
+  localStorage.setItem('gemini_key', k);
+  toast('API key saved','success');
+}
+function getKey() {
+  return document.getElementById('apiKey').value.trim() || localStorage.getItem('gemini_key') || '';
+}
+
+// ── PHOTO ────────────────────────────────────────────────────
+function handlePhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  state.photoMime = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    state.photoB64 = e.target.result.split(',')[1];
+    const img = document.getElementById('photoPreview');
+    img.src = e.target.result;
+    img.classList.remove('hidden');
+    document.getElementById('uploadPlaceholder').classList.add('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+function toggleTag(el) { el.classList.toggle('active'); }
+function getActiveTags() {
+  return [...document.querySelectorAll('#focusTags .tag.active')].map(t => t.dataset.val);
+}
+
+// ── MODAL ────────────────────────────────────────────────────
+function confirmGenerate() {
+  if (state.plan) document.getElementById('confirmModal').classList.add('show');
+  else generatePlan();
+}
+function closeModal() { document.getElementById('confirmModal').classList.remove('show'); }
+document.addEventListener('click', e => { if (e.target.id==='confirmModal') closeModal(); });
+
+// ── GEMINI ───────────────────────────────────────────────────
+async function callGemini(systemPrompt, messages, schema) {
+  const key = getKey();
+  if (!key) throw new Error('No API key. Enter your Gemini key above.');
+  const res = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: messages,
+        generationConfig: { response_mime_type: 'application/json', response_schema: schema }
+      })
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    throw new Error(err.error?.message || 'API error ' + res.status);
+  }
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return JSON.parse(text);
+}
+
+function buildParts(text) {
+  const parts = [{ text }];
+  if (state.photoB64) parts.unshift({ inline_data: { mime_type: state.photoMime, data: state.photoB64 } });
+  return parts;
+}
+
+// ── GENERATE ─────────────────────────────────────────────────
+async function generatePlan() {
+  if (!getKey()) { showError('Please enter your Gemini API key.'); return; }
+  const mealCount = document.getElementById('mealCount').value;
+  const focusTags = getActiveTags();
+  const fridgeText = document.getElementById('fridgeText').value.trim();
+  const profile = getProfile();
+
+  let userText = 'Create a ' + mealCount + '-meal plan for a family of four';
+  if (profile.name) userText += ' (the ' + profile.name + ' family)';
+  if (profile.kids) userText += ' with ' + profile.kids + ' kid(s)';
+  userText += '.';
+  if (focusTags.length) userText += ' Focus: ' + focusTags.join(', ') + '.';
+  if (fridgeText) userText += ' Extra fridge items: ' + fridgeText + '.';
+  if (profile.allergies) userText += ' NEVER include: ' + profile.allergies + '.';
+  
+  if (state.favourites.size > 0) {
+    userText += ' Feel free to repeat these favourites: ' + [...state.favourites].join(', ') + '.';
+  }
+
+  const recentCutoff = Date.now() - 14*24*60*60*1000;
+  const recentTitles = state.history.filter(h => h.date > recentCutoff).map(h => h.title);
+  if (recentTitles.length) userText += ' Try to avoid repeating these recent meals: ' + recentTitles.slice(-15).join(', ') + '.';
+  if (state.blacklist.length) userText += ' NEVER include these blacklisted meals: ' + state.blacklist.join(', ') + '.';
+
+  setLoading(true, 'Consulting the culinary architect\u2026');
+  hideError();
+  try {
+    const plan = await callGemini(buildFullPrompt(), [{ role:'user', parts: buildParts(userText) }], FULL_SCHEMA);
+    state.plan = plan;
+    state.currentGenId = Date.now();
+    plan.meals.forEach(m => state.history.push({ title: m.title, date: state.currentGenId, genId: state.currentGenId }));
+    saveHistory();
+    renderResults(true);
+  } catch(e) { showError(e.message); }
+  finally { setLoading(false); }
+}
+
+// ── SWAP & BAN ───────────────────────────────────────────────
+async function swapMeal(idx) {
+  if (state.swapInProgress) { toast('Please wait for the current swap to finish','error'); return; }
+  const meal = state.plan.meals[idx];
+  const fridgeText = document.getElementById('fridgeText').value.trim();
+  const profile = getProfile();
+  const others = state.plan.meals.filter((_,i) => i!==idx).map(m => m.title);
+
+  let userText = 'Replace "' + meal.title + '" with a completely different RecipeTin Eats recipe.';
+  userText += ' Do NOT suggest any of: ' + others.join(', ') + '.';
+  if (getActiveTags().length) userText += ' Keep focus: ' + getActiveTags().join(', ') + '.';
+  if (fridgeText) userText += ' Try to use: ' + fridgeText + '.';
+  if (profile.allergies) userText += ' NEVER include: ' + profile.allergies + '.';
+
+  const recentCutoff = Date.now() - 14*24*60*60*1000;
+  const recentTitles = state.history.filter(h => h.date > recentCutoff).map(h => h.title);
+  if (recentTitles.length) userText += ' Try to avoid: ' + recentTitles.slice(-10).join(', ') + '.';
+  if (state.blacklist.length) userText += ' NEVER include: ' + state.blacklist.join(', ') + '.';
+
+  state.undoMeal = { idx, meal };
+  state.swapInProgress = true;
+  setDownloadDisabled(true);
+
+  const wrapper = document.querySelector('[data-wrapper="'+idx+'"]');
+  const btn = document.querySelector('[data-swap="'+idx+'"]');
+  if (wrapper) wrapper.classList.add('swapping');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="swap-spinner"></span>'; }
+
+  try {
+    const newMeal = await callGemini(SWAP_PROMPT, [{ role:'user', parts: buildParts(userText) }], MEAL_SCHEMA);
+    state.plan.meals[idx] = newMeal;
+    state.history.push({ title: newMeal.title, date: Date.now(), genId: state.currentGenId });
+    saveHistory();
+    renderResults(false);
+    toastWithUndo('Meal swapped');
+    regenShoppingList();
+  } catch(e) {
+    state.undoMeal = null;
+    toast('Swap failed: ' + e.message, 'error');
+    if (wrapper) wrapper.classList.remove('swapping');
+    if (btn) { btn.disabled = false; btn.innerHTML = '\uD83D\uDD04 Swap'; }
+  } finally {
+    state.swapInProgress = false;
+    setDownloadDisabled(false);
+  }
+}
+
+async function blacklistMeal(idx) {
+  if (state.swapInProgress) return;
+  const meal = state.plan.meals[idx];
+  state.blacklist.push(meal.title);
+  saveHistory();
+  toast('Added to blacklist. Swapping...', '');
+  await swapMeal(idx);
+}
+
+function undoSwap() {
+  if (!state.undoMeal) return;
+  const { idx, meal } = state.undoMeal;
+  state.plan.meals[idx] = meal;
+  state.undoMeal = null;
+  renderResults(false);
+  toast('Swap undone','');
+  regenShoppingList();
+}
+
+async function regenShoppingList() {
+  if (!state.plan) return;
+  const titles = state.plan.meals.map(m => m.title).join(', ');
+  const profile = getProfile();
+  let userText = 'Generate a shopping list for these meals: ' + titles + '.';
+  if (profile.allergies) userText += ' Exclude: ' + profile.allergies + '.';
+  try {
+    const sl = await callGemini(SHOPPING_PROMPT, [{ role:'user', parts:[{ text: userText }] }], SHOPPING_SCHEMA);
+    state.plan.shopping_list = sl;
+    renderShoppingList();
+  } catch(e) { /* silent */ }
+}
+
+function setDay(idx, day) {
+  state.plan.meals[idx].day = state.plan.meals[idx].day === day ? null : day;
+  renderMealCards(false);
+}
+
+// ── RENDER ───────────────────────────────────────────────────
+function renderResults(animate) {
+  if (!state.plan) return;
+  renderMealCards(animate);
+  renderShoppingList();
+  document.getElementById('results').classList.remove('hidden');
+}
+
+function renderMealCards(animate) {
+  const recentCutoff = Date.now() - 14*24*60*60*1000;
+
+  document.getElementById('mealCards').innerHTML = state.plan.meals.map((m, i) => {
+    const isFav = state.favourites.has(m.title);
+    const url = escH(getRecipeUrl(m));
+    const dc = diffClass(m.difficulty);
+    const delay = animate ? ' style="animation-delay:' + (i*60) + 'ms"' : '';
+    const wrapCls = 'swipe-wrapper' + (animate ? ' animate' : '');
+
+    const isRecent = state.history.some(h => h.title === m.title && h.genId !== state.currentGenId && h.date > recentCutoff);
+    const recentBadge = isRecent ? '<span class="badge" style="background:rgba(255,255,255,0.08);color:#a1a1aa;">\u23F3 Had recently</span>' : '';
+
+    let ingHTML = '';
+    if (m.ingredients) {
+      const have   = (m.ingredients.have   || []);
+      const pantry = (m.ingredients.pantry || []);
+      const need   = (m.ingredients.need   || []);
+      if (have.length || pantry.length || need.length) {
+        const haveTags   = have.map(i   => '<span class="ing-have">'  +'\u2713 '+escH(i)+'</span>').join('');
+        const pantryTags = pantry.map(i => '<span class="ing-pantry">'+'\u2713 '+escH(i)+'</span>').join('');
+        const needTags   = need.map(i   => '<span class="ing-need">'  +'\u2715 '+escH(i)+'</span>').join('');
+        ingHTML = '<div class="ingredients-label">Ingredients</div>'
+          + '<div class="ing-tags">' + haveTags + pantryTags + needTags + '</div>';
+      }
+    }
+
+    const keywords = (m.image_search_keywords || m.title || 'food recipe').replace(/\s+/g,',');
+    const imgSrc = 'https://source.unsplash.com/480x280/?' + encodeURIComponent(keywords.replace(/,/g,' ') + ' food');
+    const heroHTML = '<div class="meal-hero-wrap">'
+      + '<div class="meal-hero-skeleton" id="hero-skel-' + i + '"></div>'
+      + '<img class="meal-hero" id="hero-img-' + i + '" loading="lazy" src="' + imgSrc + '" alt="" '
+      + 'style="display:none;" '
+      + 'onload="this.style.display=\'block\';var s=document.getElementById(\'hero-skel-' + i + '\');if(s)s.style.display=\'none\';" '
+      + 'onerror="this.style.display=\'none\';var s=document.getElementById(\'hero-skel-' + i + '\');if(s){s.style.animation=\'none\';s.style.background=\'linear-gradient(135deg,#1c1c1c 0%,#2a2010 50%,#1c1410 100%)\';}">'
+      + '</div>';
+
+    const selectedDay = m.day || '';
+    const dayHTML = '<div class="day-selector">' +
+      DAYS.map(d => `<button class="day-pill ${selectedDay===d?'active':''}" onclick="setDay(${i},'${d}')">${d}</button>`).join('') +
+      '</div>';
+      
+    // Cost Badge Rendering logic
+    let costText = '';
+    if(m.estimated_cost_aud) costText += '\uD83D\uDCB5 ' + escH(m.estimated_cost_aud);
+    if(m.estimated_cost_per_person_aud) costText += ' (' + escH(m.estimated_cost_per_person_aud) + '/pp)';
+    const costBadge = costText ? '<span class="badge badge-cost">' + costText + '</span>' : '';
+
+    return '<div class="' + wrapCls + '" data-wrapper="' + i + '"' + delay + '>'
+      + '<div class="swipe-action" onclick="swapMeal(' + i + ')"><span style="font-size:20px;">\uD83D\uDD04</span> Swap</div>'
+      + '<div class="meal-card" data-card="' + i + '" data-swipe-idx="' + i + '">'
+      + heroHTML
+      + '<div class="meal-card-body">'
+      + '<div class="meal-card-top">'
+      + '<div class="meal-title"><a href="' + url + '" target="_blank">' + escH(m.title) + '</a></div>'
+      + '<div class="card-actions">'
+      + '<button class="fav-btn' + (isFav?' active':'') + '" data-fav="' + escH(m.id) + '" onclick="toggleFavourite(\'' + escH(m.id) + '\', \'' + escH(m.title).replace(/'/g,"\\'") + '\')">\u2665</button>'
+      + '<button class="swap-btn hide-on-mobile" onclick="blacklistMeal(' + i + ')" title="Never suggest this">\uD83D\uDEAB Ban</button>'
+      + '<button class="swap-btn hide-on-mobile" data-swap="' + i + '" onclick="swapMeal(' + i + ')">\uD83D\uDD04 Swap</button>'
+      + '</div></div>'
+      + '<p class="meal-desc">' + escH(m.description) + '</p>'
+      + dayHTML
+      + '<div class="badge-row">'
+      + recentBadge
+      + '<span class="badge badge-macros">\uD83D\uDD25 ' + escH(m.macros) + '</span>'
+      + (m.prep_time ? '<span class="badge badge-time">\u23F1 ' + escH(m.prep_time) + '</span>' : '')
+      + (m.difficulty ? '<span class="badge ' + dc + '">' + escH(m.difficulty) + '</span>' : '')
+      + costBadge
+      + '</div>'
+      + ingHTML
+      + '</div></div></div>';
+  }).join('');
+}
+
+function renderShoppingList() {
+  const sl = state.plan.shopping_list || {};
+  const el = document.getElementById('shoppingList');
+  
+  let totalCost = 0;
+  state.plan.meals.forEach(m => {
+    if(m.estimated_cost_aud) {
+      const val = parseFloat(m.estimated_cost_aud.replace(/[^0-9.]/g, ''));
+      if(!isNaN(val)) totalCost += val;
+    }
+  });
+  
+  const headcount = getFamilyHeadcount();
+  const ppCost = totalCost > 0 ? (totalCost / headcount) : 0;
+
+  const listHTML = AISLE_ORDER.map(cat => {
+    const items = sl[cat];
+    if (!items || !items.length) return '';
+    const rows = items.map(item => {
+      const key = checkboxKey(cat, item);
+      return '<div class="shop-item">'
+        + '<input type="checkbox" id="' + escH(key) + '" onchange="localStorage.setItem(\'' + escH(key) + '\',this.checked)">'
+        + '<label for="' + escH(key) + '">' + escH(item) + '</label></div>';
+    }).join('');
+    return '<div class="shop-section"><div class="shop-category">' + escH(cat) + '</div>' + rows + '</div>';
+  }).join('');
+  
+  const costHTML = totalCost > 0 ? '<div class="shop-cost"><span>Estimated Total Cost</span><span>~$' + totalCost.toFixed(0) + '<span class="shop-cost-sub">(~$' + ppCost.toFixed(2) + '/pp)</span></span></div>' : '';
+  
+  el.innerHTML = listHTML + costHTML;
+  el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    if (localStorage.getItem(cb.id) === 'true') cb.checked = true;
+  });
+}
+
+// ── SWIPE LOGIC ──────────────────────────────────────────────
+var touchStartX = 0, touchStartY = 0, touchCard = null, touchCurrentX = 0;
+
+document.addEventListener('touchstart', e => {
+  const card = e.target.closest('.meal-card[data-swipe-idx]');
+  if (!card) return;
+  touchCard = card;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  const t = touchCard.style.transform;
+  touchCurrentX = t.includes('translateX') ? parseFloat(t.replace(/[^\d.-]/g, '')) : 0;
+  touchCard.style.transition = 'none';
+}, { passive: true });
+
+document.addEventListener('touchmove', e => {
+  if (!touchCard) return;
+  const dx = e.touches[0].clientX - touchStartX;
+  const dy = e.touches[0].clientY - touchStartY;
+  if (Math.abs(dx) > Math.abs(dy) + 5) {
+    if (e.cancelable) e.preventDefault();
+    let newX = touchCurrentX + dx;
+    if (newX > 0) newX = 0;
+    touchCard.style.transform = 'translateX(' + newX + 'px)';
+  }
+}, { passive: false });
+
+document.addEventListener('touchend', e => {
+  if (!touchCard) return;
+  touchCard.style.transition = 'transform 0.2s cubic-bezier(0.1, 0.7, 0.1, 1)';
+  const t = touchCard.style.transform;
+  const x = t.includes('translateX') ? parseFloat(t.replace(/[^\d.-]/g, '')) : 0;
+  if (x < -60) {
+    touchCard.style.transform = 'translateX(-80px)';
+  } else {
+    touchCard.style.transform = 'translateX(0px)';
+  }
+  touchCard = null;
+});
+
+// ── DOWNLOAD ─────────────────────────────────────────────────
+function downloadHTML() {
+  if (!state.plan) return;
+  const profile = getProfile();
+  const familyLabel = profile.name ? 'The ' + profile.name + ' Family' : 'Family';
+  const now = new Date();
+  const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay()+6)%7));
+  const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+  const fmt = d => d.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+  const weekLabel = fmt(mon) + ' \u2013 ' + fmt(sun);
+
+  const dayOrder = { 'Mon':1, 'Tue':2, 'Wed':3, 'Thu':4, 'Fri':5, 'Sat':6, 'Sun':7 };
+  const sortedMeals = [...state.plan.meals].sort((a,b) => {
+    const da = a.day ? dayOrder[a.day] : 99;
+    const db = b.day ? dayOrder[b.day] : 99;
+    return da - db;
+  });
+
+  let lastDay = null;
+  const mealCardsHTML = sortedMeals.map(m => {
+    let dayHeading = '';
+    if (m.day && m.day !== lastDay) {
+      dayHeading = '<h3 style="font-family:Georgia,serif;font-size:1.3rem;color:#f59e0b;margin:28px 0 12px;border-bottom:1px solid rgba(245,158,11,0.3);padding-bottom:6px;">' + escH(m.day) + '</h3>';
+      lastDay = m.day;
+    } else if (!m.day && lastDay !== 'Unassigned' && sortedMeals.some(x=>x.day)) {
+      dayHeading = '<h3 style="font-family:Georgia,serif;font-size:1.3rem;color:#f59e0b;margin:28px 0 12px;border-bottom:1px solid rgba(245,158,11,0.3);padding-bottom:6px;">Unassigned</h3>';
+      lastDay = 'Unassigned';
+    }
+
+    const url = escH(getRecipeUrl(m));
+    const dc = m.difficulty && m.difficulty.toLowerCase()==='easy' ? '#34d399'
+             : m.difficulty && m.difficulty.toLowerCase()==='hard' ? '#f87171' : '#f59e0b';
+    const keywords = (m.image_search_keywords || m.title || 'food recipe');
+    const imgUrl = 'https://source.unsplash.com/480x280/?' + encodeURIComponent(keywords + ' food');
+    const heroSection = '<div style="position:relative;overflow:hidden;border-radius:17px 17px 0 0;">'
+      + '<img src="' + escH(imgUrl) + '" alt="" loading="lazy" class="meal-hero-print" '
+      + 'style="width:100%;height:180px;object-fit:cover;display:block;background:linear-gradient(135deg,#1c1c1c,#2a2010);" '
+      + 'onerror="this.style.background=\'linear-gradient(135deg,#1c1c1c,#2a2010)\';this.style.height=\'8px\';">'
+      + '</div>';
+    
+    let ingSection = '';
+    if (m.ingredients) {
+      const have   = (m.ingredients.have   || []);
+      const pantry = (m.ingredients.pantry || []);
+      const need   = (m.ingredients.need   || []);
+      if (have.length || pantry.length || need.length) {
+        const mk = (arr, bg, col, icon, border) => arr.map(i =>
+          '<span style="background:'+bg+';color:'+col+';border-radius:6px;padding:3px 8px;font-size:11px;border:1px solid '+border+';">'+icon+' '+escH(i)+'</span>'
+        ).join('');
+        const tags = mk(have,  'rgba(52,211,153,0.1)',  '#34d399', '\u2713', 'rgba(52,211,153,0.2)')
+                   + mk(pantry,'rgba(245,158,11,0.12)', '#f59e0b', '\u2713', 'rgba(245,158,11,0.2)')
+                   + mk(need,  'rgba(248,113,113,0.1)', '#f87171', '\u2715', 'rgba(248,113,113,0.2)');
+        ingSection = '<div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:#64748b;margin:10px 0 6px;">Ingredients</div>'
+          + '<div style="display:flex;flex-wrap:wrap;gap:5px;">' + tags + '</div>';
+      }
+    }
+    
+    const qrSection = '<div class="qr-wrapper" style="float:right;margin:0 0 10px 14px;"><div class="qr-code-container" data-url="' + url + '"></div></div>';
+    
+    let costText = '';
+    if(m.estimated_cost_aud) costText += '\uD83D\uDCB5 ' + escH(m.estimated_cost_aud);
+    if(m.estimated_cost_per_person_aud) costText += ' (' + escH(m.estimated_cost_per_person_aud) + '/pp)';
+    const costBadge = costText ? '<span style="background:rgba(16,185,129,0.12);color:#10b981;border:1px solid rgba(16,185,129,0.3);border-radius:6px;padding:3px 9px;font-size:11px;">' + costText + '</span>' : '';
+
+    return dayHeading + '<div style="background:#1c1c1c;border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;margin-bottom:14px;page-break-inside:avoid;">'
+      + heroSection
+      + '<div style="padding:18px 18px 16px;">'
+      + qrSection
+      + '<a href="' + url + '" target="_blank" style="font-family:Georgia,serif;font-size:1.1rem;color:#fff;text-decoration:none;display:block;margin-bottom:4px;">' + escH(m.title) + '</a>'
+      + '<div class="recipe-url-print" style="display:none;font-size:10px;color:#888;word-break:break-all;margin-bottom:8px;">' + url + '</div>'
+      + '<p style="color:#64748b;font-size:13px;margin-bottom:10px;line-height:1.5;">' + escH(m.description) + '</p>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;clear:both;">'
+      + '<span style="background:rgba(245,158,11,0.15);color:#f59e0b;border-radius:6px;padding:3px 9px;font-size:11px;">\uD83D\uDD25 ' + escH(m.macros) + '</span>'
+      + (m.prep_time ? '<span style="background:rgba(96,165,250,0.12);color:#60a5fa;border-radius:6px;padding:3px 9px;font-size:11px;">\u23F1 ' + escH(m.prep_time) + '</span>' : '')
+      + (m.difficulty ? '<span style="background:rgba(52,211,153,0.1);color:' + dc + ';border-radius:6px;padding:3px 9px;font-size:11px;">' + escH(m.difficulty) + '</span>' : '')
+      + costBadge
+      + '</div>'
+      + ingSection
+      + '</div></div>';
+  }).join('');
+
+  const sl = state.plan.shopping_list || {};
+  let totalCost = 0;
+  state.plan.meals.forEach(m => {
+    if(m.estimated_cost_aud) {
+      const val = parseFloat(m.estimated_cost_aud.replace(/[^0-9.]/g, ''));
+      if(!isNaN(val)) totalCost += val;
+    }
+  });
+  const headcount = getFamilyHeadcount();
+  const ppCost = totalCost > 0 ? (totalCost / headcount) : 0;
+
+  const shoppingHTML = AISLE_ORDER.map(cat => {
+    const items = sl[cat];
+    if (!items || !items.length) return '';
+    const rows = items.map(item => {
+      const key = checkboxKey(cat, item);
+      return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);">'
+        + '<input type="checkbox" id="' + escH(key) + '" style="accent-color:#f59e0b;width:16px;height:16px;flex-shrink:0;">'
+        + '<label for="' + escH(key) + '" style="font-size:14px;cursor:pointer;flex:1;user-select:none;">' + escH(item) + '</label></div>';
+    }).join('');
+    return '<div style="margin-bottom:22px;">'
+      + '<div style="font-size:11px;font-weight:500;letter-spacing:1.2px;text-transform:uppercase;color:#f59e0b;margin-bottom:10px;">' + escH(cat) + '</div>'
+      + rows + '</div>';
+  }).join('');
+
+  const finalCostHTML = totalCost > 0 ? '<div style="padding-top:16px; border-top:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; color:#f59e0b; font-weight:700; font-size:15px; margin-top:-6px;"><span>Estimated Total Cost</span><span>~$' + totalCost.toFixed(0) + ' <span style="font-size:12px;font-weight:400;color:#64748b;">(~$' + ppCost.toFixed(2) + '/pp)</span></span></div>' : '';
+
+  const html = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
+    + '<title>' + escH(familyLabel) + ' Meal Plan</title>\n'
+    + '<script src="https://cdn.tailwindcss.com"><\/script>\n'
+    + '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>\n'
+    + '<style>\n'
+    + 'body{background:#050505;color:#e2e8f0;font-family:sans-serif;}\n'
+    + '.glass{background:rgba(255,255,255,0.03);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);}\n'
+    + 'input[type=checkbox]:checked+label{text-decoration:line-through;color:#64748b;}\n'
+    + '.qr-wrapper{display:none;}\n'
+    + '@media print{'
+    + 'body{background:#fff!important;color:#111!important;}'
+    + 'a{color:#111!important;}'
+    + '.glass{background:#f9f9f9!important;border:1px solid #ddd!important;}'
+    + '.cover{page-break-after:always;}'
+    + '.cover-ornament{display:none!important;}'
+    + 'h1,h2,h3{color:#b45309!important;}'
+    + 'div[style*="background:#1c1c1c"]{background:#fff!important;border:1px solid #ddd!important;color:#111!important;page-break-inside:avoid;break-inside:avoid;}'
+    + 'img.meal-hero-print{height:120px!important;}'
+    + '.recipe-url-print{display:block!important;}'
+    + '.qr-wrapper{display:block!important;}'
+    + 'input[type=checkbox]{appearance:none;-webkit-appearance:none;width:12px;height:12px;border:1px solid #999;border-radius:50%;display:inline-block;}'
+    + 'input[type=checkbox]:checked{background:none!important;text-decoration:none!important;}'
+    + 'input[type=checkbox]:checked+label{text-decoration:none!important;color:inherit!important;}'
+    + '}'
+    + '</style>\n</head>\n'
+    + '<body class="p-6 pb-24 max-w-md mx-auto">\n'
+    + '<div class="cover" style="text-align:center;padding:40px 0 60px;">'
+    + '<div style="font-size:2.5rem;margin-bottom:4px;" class="cover-ornament">\uD83C\uDF7D</div>'
+    + '<h1 style="font-family:Georgia,serif;font-size:2rem;color:#f59e0b;margin-bottom:6px;">' + escH(familyLabel) + '</h1>'
+    + '<p style="color:#64748b;font-size:14px;">Meal Plan \u00B7 ' + escH(weekLabel) + '</p></div>\n'
+    + '<h2 style="font-family:Georgia,serif;font-size:1.5rem;color:#f59e0b;margin-bottom:16px;">This Week\'s Menu</h2>\n'
+    + '<div>' + mealCardsHTML + '</div>\n'
+    + '<h2 style="font-family:Georgia,serif;font-size:1.5rem;color:#f59e0b;margin:40px 0 16px;">Woolworths List</h2>\n'
+    + '<div class="glass" style="padding:24px;border-radius:18px;">' + shoppingHTML + finalCostHTML + '</div>\n'
+    + '<script>\n'
+    + 'document.querySelectorAll(\'input[type="checkbox"]\').forEach(function(b){'
+    + 'if(localStorage.getItem(b.id)==="true")b.checked=true;'
+    + 'b.addEventListener("change",function(){localStorage.setItem(b.id,b.checked);});'
+    + '});\n'
+    + 'document.querySelectorAll(".qr-code-container").forEach(function(el) {'
+    + 'new QRCode(el, { text: el.getAttribute("data-url"), width: 64, height: 64, colorDark: "#111111", colorLight: "#ffffff" });'
+    + '});\n'
+    + '<\/script>\n</body>\n</html>';
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'meal-plan.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── UI HELPERS ───────────────────────────────────────────────
+function setLoading(on, msg) {
+  document.getElementById('loader').classList.toggle('hidden', !on);
+  if (msg) document.getElementById('loaderMsg').textContent = msg;
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = on;
+  btn.textContent = on ? 'Generating\u2026' : '\u2736 Generate This Week\'s Plan';
+  if (on) document.getElementById('results').classList.add('hidden');
+}
+function setDownloadDisabled(v) {
+  const b = document.getElementById('downloadBtn');
+  if (b) b.disabled = v;
+}
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = '\u26A0 ' + msg;
+  el.classList.remove('hidden');
+  el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function hideError() { document.getElementById('errorBox').classList.add('hidden'); }
+
+var toastTimer;
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  document.getElementById('toastUndo').classList.add('hidden');
+  el.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+function toastWithUndo(msg) {
+  const el = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  document.getElementById('toastUndo').classList.remove('hidden');
+  el.className = 'toast show success';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.classList.remove('show'); state.undoMeal = null; }, 5000);
+}
+
+// ── DRAG DROP ────────────────────────────────────────────────
+var zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    const dt = new DataTransfer(); dt.items.add(file);
+    document.getElementById('photoInput').files = dt.files;
+    handlePhoto(document.getElementById('photoInput'));
+  }
+});
+</script>
+</body>
+</html>
