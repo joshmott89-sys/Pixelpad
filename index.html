@@ -376,6 +376,10 @@ input, select, textarea { font-family: var(--mono); }
     </div>
     <button id="struct-close" onmousedown="event.preventDefault()" onclick="closeStructure()">✕</button>
   </div>
+  <div style="padding:8px 12px;border-bottom:1px solid var(--bdr);background:var(--rai);">
+    <input type="text" id="struct-search" placeholder="Filter symbols…" oninput="filterStructure(this.value)"
+      style="width:100%;padding:7px 10px;background:var(--bg);border:1px solid var(--bdr2);border-radius:var(--r-sm);color:var(--tx);font-size:13px;font-family:var(--mono);outline:none;">
+  </div>
   <div id="struct-scroll">
     <div id="struct-empty">Parsing…</div>
   </div>
@@ -562,8 +566,24 @@ input, select, textarea { font-family: var(--mono); }
     <input type="password" id="cfg-ghtoken" placeholder="ghp_...">
     <label class="m-label" style="margin-top:10px;">Gemini API Key</label>
     <input type="password" id="cfg-gkey" placeholder="AIza…">
+    <label class="m-label">Gemini Model</label>
+    <select id="cfg-gmodel" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bdr2);border-radius:var(--r-sm);color:var(--tx);font-size:12px;font-family:var(--mono);margin-bottom:4px;">
+      <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+      <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+      <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+      <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+      <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+    </select>
     <label class="m-label">Claude API Key</label>
     <input type="password" id="cfg-ckey" placeholder="sk-ant-…">
+    <label class="m-label">Claude Model</label>
+    <select id="cfg-cmodel" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bdr2);border-radius:var(--r-sm);color:var(--tx);font-size:12px;font-family:var(--mono);margin-bottom:4px;">
+      <option value="claude-sonnet-4-20250514">claude-sonnet-4 (latest)</option>
+      <option value="claude-3-7-sonnet-20250219">claude-3.7-sonnet</option>
+      <option value="claude-3-5-sonnet-20241022">claude-3.5-sonnet</option>
+      <option value="claude-3-5-haiku-20241022">claude-3.5-haiku</option>
+      <option value="claude-3-opus-20240229">claude-3-opus</option>
+    </select>
     <div class="m-row">
       <button class="m-btn ghost" onclick="closeModal('mod-settings')">Cancel</button>
       <button class="m-btn go" onclick="saveSettings()">Save</button>
@@ -676,6 +696,8 @@ input, select, textarea { font-family: var(--mono); }
   <div class="modal-box">
     <div class="m-pill"></div>
     <div class="m-title">&#x1F3AF; Replace Block</div>
+    <input type="text" id="bp-search" placeholder="Filter blocks…" oninput="filterBlockPicker(this.value)"
+      style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bdr2);border-radius:var(--r-sm);color:var(--tx);font-size:12px;font-family:var(--mono);margin-bottom:10px;outline:none;">
     <div id="bp-list"></div>
     <div class="m-row">
       <button class="m-btn ghost" style="flex:1;" onclick="closeModal('mod-blockpick')">Cancel</button>
@@ -714,7 +736,7 @@ input, select, textarea { font-family: var(--mono); }
 'use strict';
 
 let _ed;
-let cfg = { gkey:'', ckey:'', ghtoken:'' };
+let cfg = { gkey:'', ckey:'', ghtoken:'', gmodel:'gemini-2.5-flash', cmodel:'claude-sonnet-4-20250514' };
 let ghUserCache = null; // session-only; populated by ensureGhUser() from PAT, never persisted
 let W = { activeProject: null, projects: {}, localOrder: [], syncedOrder: [] };
 let curFile = null;
@@ -951,18 +973,35 @@ function confirmNewProj() {
   renderSide(); updateDynamicToolbars(); toast('Local project created', 'ok');
 }
 
-function deleteProj(name, e) {
+async function deleteProj(name, e) {
   if (e) e.stopPropagation();
   if (name === 'Default') return toast('Cannot delete Default', 'bad');
   if (!confirm(`Delete "${name}" locally?`)) return;
-  
+
+  // Check if this project is synced to GitHub — offer to delete there too
+  const proj = W.projects[name];
+  const isSynced = proj && proj.ghRepo;
+  if (isSynced && cfg.ghtoken) {
+    if (confirm(`Also delete the GitHub repo "${name}"?\n\nThis is permanent and cannot be undone.`)) {
+      try {
+        const hasUser = await ensureGhUser(); 
+        if (hasUser) {
+          await ghApi(`/repos/${ghUserCache}/${name}`, 'DELETE');
+          toast('GitHub repo deleted', 'ok');
+        }
+      } catch(err) {
+        toast('GitHub delete failed: ' + err.message, 'bad');
+      }
+    }
+  }
+
   delete W.projects[name];
   W.localOrder = W.localOrder.filter(n => n !== name);
   W.syncedOrder = W.syncedOrder.filter(n => n !== name);
-  
+
   if (W.activeProject === name) switchProj('Default');
   else { saveWorkspace(); renderSide(); }
-  toast('Removed', 'ok');
+  toast('Project removed', 'ok');
 }
 
 function setHeaderFile(filename, projName) {
@@ -1275,12 +1314,57 @@ function scrollToTop() {
 
 // ── Structure Navigator ───────────────────────────────────────────────────
 
+let _structNodes = []; // flat list for search filtering
+
 function openStructure() {
   const src  = ed().getValue();
   const file = curFile || 'untitled';
   document.getElementById('struct-file').textContent = ' — ' + file;
-  renderStructure(parseStructure(src, file));
+  document.getElementById('struct-search').value = '';
+  const tree = parseStructure(src, file);
+  // Build flat list for search
+  _structNodes = [];
+  function flatten(nodes) { nodes.forEach(n => { _structNodes.push(n); flatten(n.children || []); }); }
+  flatten(tree);
+  renderStructure(tree);
   document.getElementById('struct-panel').classList.add('on');
+}
+
+function filterStructure(q) {
+  const container = document.getElementById('struct-scroll');
+  if (!q) {
+    // Restore full tree
+    const src  = ed().getValue();
+    const file = curFile || 'untitled';
+    renderStructure(parseStructure(src, file));
+    return;
+  }
+  const lq = q.toLowerCase();
+  const matches = _structNodes.filter(n => n.label.toLowerCase().includes(lq));
+  if (!matches.length) { container.innerHTML = '<div id="struct-empty">No matches</div>'; return; }
+  container.innerHTML = '';
+  // Render as flat filtered list — no hierarchy, just matching rows
+  matches.forEach(node => {
+    const row = document.createElement('div');
+    row.className = 'st-node st-top';
+    const ico = document.createElement('span'); ico.className = 'st-icon'; ico.textContent = node.icon;
+    const lbl = document.createElement('span'); lbl.className = 'st-label'; lbl.textContent = node.label;
+    const ln  = document.createElement('span'); ln.className  = 'st-line';  ln.textContent  = node.line;
+    row.append(ico, lbl, ln);
+    row.addEventListener('click', () => {
+      closeStructure();
+      if (_ed) _ed.blur();
+      setTimeout(() => {
+        const startRow = node.line - 1;
+        const endRow   = node.endLine ? node.endLine - 1 : startRow;
+        ed().selection.clearSelection();
+        ed().selection.setSelectionRange({ start: { row: startRow, column: 0 }, end: { row: endRow, column: ed().session.getLine(endRow).length } });
+        ed().renderer.scrollToRow(startRow);
+        ed().blur();
+      }, 290);
+    });
+    container.appendChild(row);
+  });
 }
 
 function closeStructure() {
@@ -1684,21 +1768,34 @@ function getBlockExtent(startRow) {
   return { startRow, endRow };
 }
 
+let _bpBlocks = []; // stored so filter can re-render without re-scanning
+
+function renderBpList(blocks) {
+  document.getElementById('bp-list').innerHTML = blocks.length
+    ? blocks.map(b =>
+        `<button class="bp-item" onclick="applyBlockReplace(${b.row})">` +
+          `<span class="bp-row">L${b.row + 1}</span>` +
+          `<span class="bp-lbl">${b.label.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span>` +
+        `</button>`
+      ).join('')
+    : '<p style="text-align:center;color:var(--mu);font-size:12px;padding:16px 0;">No matches</p>';
+}
+
+function filterBlockPicker(q) {
+  const lq = q.toLowerCase();
+  renderBpList(lq ? _bpBlocks.filter(b => b.label.toLowerCase().includes(lq)) : _bpBlocks);
+}
+
 function openBlockPicker() {
-  const blocks = scanCodeBlocks();
-  if (!blocks.length) {
-    // No identifiable blocks — fall back to insert at cursor
+  _bpBlocks = scanCodeBlocks();
+  if (!_bpBlocks.length) {
     ed().insert(mpParsed || '');
     setUD(true); ed().focus();
     toast('No blocks found \u2014 inserted at cursor', '');
     return;
   }
-  document.getElementById('bp-list').innerHTML = blocks.map(b =>
-    `<button class="bp-item" onclick="applyBlockReplace(${b.row})">` +
-      `<span class="bp-row">L${b.row + 1}</span>` +
-      `<span class="bp-lbl">${b.label.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span>` +
-    `</button>`
-  ).join('');
+  document.getElementById('bp-search').value = '';
+  renderBpList(_bpBlocks);
   openModal('mod-blockpick');
 }
 
@@ -1870,7 +1967,13 @@ function openSearch() { srchOpen = true; document.getElementById('srch').classLi
 function closeSearch() { srchOpen = false; document.getElementById('srch').classList.remove('on'); document.getElementById('srch-count').textContent = ''; srchTotal = 0; srchIdx = 0; try { ed().find('', {}); } catch(e) {} lay(); ed().focus(); }
 function srchAceOpts(e) { return Object.assign({ caseSensitive: srchOpts.Aa, wholeWord: srchOpts.W, regExp: srchOpts.Re, wrap: true }, e || {}); }
 function srchFind() { const t = document.getElementById('srch-inp').value; const cnt = document.getElementById('srch-count'); if (!t) { cnt.textContent = ''; return; } try { if (ed().find(t, srchAceOpts({ skipCurrent: false, start: { row: 0, column: 0 } }))) { srchIdx=1; srchTotal=countAllMatches(t); cnt.textContent = srchIdx+'/'+srchTotal; cnt.style.color='var(--ac)'; ed().scrollToLine(ed().selection.getRange().start.row, true, true); } else { srchTotal=0; srchIdx=0; cnt.textContent='0'; cnt.style.color='var(--er)'; } } catch(e) {} }
-function countAllMatches(t) { try { const Search = ace.require('ace/search').Search; const s = new Search().set(srchAceOpts({ needle: t, start: { row: 0, column: 0 } })); let n = 0; while (s.find(ed().session) && n < 5000) { n++; const r = s.find(ed().session); if (!r) break; s.set({ start: { row: r.end.row, column: r.end.column } }); } return n||1; } catch(e) { return 1; } }
+function countAllMatches(t) {
+  try {
+    const Search = ace.require('ace/search').Search;
+    const ranges = new Search().set({ ...srchAceOpts({ needle: t }), start: { row: 0, column: 0 } }).findAll(ed().session);
+    return (ranges && ranges.length) || 0;
+  } catch(e) { return 0; }
+}
 function srchNext() { const t = document.getElementById('srch-inp').value; if(!t)return; try { if (ed().find(t, srchAceOpts({ skipCurrent: true, backwards: false }))) { srchIdx = srchIdx < srchTotal ? srchIdx+1 : 1; document.getElementById('srch-count').textContent = srchIdx+'/'+srchTotal; ed().scrollToLine(ed().selection.getRange().start.row, true, true); } } catch(e){} }
 function srchPrev() { const t = document.getElementById('srch-inp').value; if(!t)return; try { if (ed().find(t, srchAceOpts({ skipCurrent: true, backwards: true }))) { srchIdx = srchIdx > 1 ? srchIdx-1 : srchTotal; document.getElementById('srch-count').textContent = srchIdx+'/'+srchTotal; ed().scrollToLine(ed().selection.getRange().start.row, true, true); } } catch(e){} }
 function srchKey(e) { if(e.key==='Enter') e.shiftKey ? srchPrev() : srchNext(); if(e.key==='Escape') closeSearch(); }
@@ -1878,13 +1981,22 @@ function srchToggle(o) { srchOpts[o] = !srchOpts[o]; document.getElementById('so
 function repOne() { const t = document.getElementById('srch-inp').value; const r = document.getElementById('rep-inp').value; if(!t)return; try { if(!ed().getSelectedText()) ed().find(t, srchAceOpts({ skipCurrent: false })); ed().replace(r); srchTotal = Math.max(0, srchTotal - 1); if (srchTotal > 0) { srchIdx = Math.min(srchIdx, srchTotal); ed().find(t, srchAceOpts({ skipCurrent: true })); } else srchIdx = 0; document.getElementById('srch-count').textContent = srchTotal ? srchIdx + '/' + srchTotal : 'Done'; toast('Replaced 1', 'ok'); } catch(e) {} }
 function repAll() { const t = document.getElementById('srch-inp').value; const r = document.getElementById('rep-inp').value; if(!t)return; try { let n=0; ed().find(t, srchAceOpts({ start: { row: 0, column: 0 }, skipCurrent: false })); while (ed().getSelectedText() && n<5000) { ed().replace(r); n++; ed().find(t, srchAceOpts({ skipCurrent: true })); } srchTotal = 0; srchIdx = 0; document.getElementById('srch-count').textContent = n ? 'Done' : 'No matches'; toast('Replaced '+n, 'ok'); } catch(e){} }
 
-function openSettings() { document.getElementById('cfg-ghtoken').value = cfg.ghtoken || ''; document.getElementById('cfg-gkey').value = cfg.gkey; document.getElementById('cfg-ckey').value = cfg.ckey; openModal('mod-settings'); }
+function openSettings() {
+  document.getElementById('cfg-ghtoken').value = cfg.ghtoken || '';
+  document.getElementById('cfg-gkey').value = cfg.gkey;
+  document.getElementById('cfg-gmodel').value = cfg.gmodel || 'gemini-2.5-flash';
+  document.getElementById('cfg-ckey').value = cfg.ckey;
+  document.getElementById('cfg-cmodel').value = cfg.cmodel || 'claude-sonnet-4-20250514';
+  openModal('mod-settings');
+}
 function saveSettings() {
   const newToken = document.getElementById('cfg-ghtoken').value.trim();
-  if (newToken !== cfg.ghtoken) ghUserCache = null; // invalidate session cache on PAT change
+  if (newToken !== cfg.ghtoken) ghUserCache = null;
   cfg.ghtoken = newToken;
-  cfg.gkey = document.getElementById('cfg-gkey').value.trim();
-  cfg.ckey = document.getElementById('cfg-ckey').value.trim();
+  cfg.gkey    = document.getElementById('cfg-gkey').value.trim();
+  cfg.gmodel  = document.getElementById('cfg-gmodel').value;
+  cfg.ckey    = document.getElementById('cfg-ckey').value.trim();
+  cfg.cmodel  = document.getElementById('cfg-cmodel').value;
   localStorage.setItem('pp_c', JSON.stringify(cfg));
   closeModal('mod-settings'); toast('Saved', 'ok');
 }
@@ -1922,8 +2034,8 @@ async function sendAI() {
   inp.disabled = false; inp.focus();
 }
 
-async function callGem(p) { const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cfg.gkey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: p }] }] }) }); const d = await res.json(); if (d.error) throw new Error(d.error.message); return d.candidates[0].content.parts[0].text; }
-async function callCla(p) { const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.ckey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: 'claude-3-5-sonnet-20241022', max_tokens: 2048, messages: [{ role: 'user', content: p }] }) }); const d = await res.json(); if (d.error) throw new Error(d.error.message || d.error.type); return d.content[0].text; }
+async function callGem(p) { const model = cfg.gmodel || 'gemini-2.5-flash'; const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.gkey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: p }] }] }) }); const d = await res.json(); if (d.error) throw new Error(d.error.message); return d.candidates[0].content.parts[0].text; }
+async function callCla(p) { const model = cfg.cmodel || 'claude-sonnet-4-20250514'; const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.ckey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model, max_tokens: 8192, messages: [{ role: 'user', content: p }] }) }); const d = await res.json(); if (d.error) throw new Error(d.error.message || d.error.type); return d.content[0].text; }
 function addMsg(txt, type) { const d = document.createElement('div'); d.className = 'a-msg ' + type; d.textContent = txt; const m = document.getElementById('ai-msgs'); m.appendChild(d); m.scrollTop = m.scrollHeight; return d; }
 
 function trigImport() { document.getElementById('imp-inp').click(); }
