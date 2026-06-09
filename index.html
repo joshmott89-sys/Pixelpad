@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="PixelPad">
 <link rel="manifest" href="./manifest.json">
-<title>pixelpadv6.7.3</title>
+<title>pixelpadv6.7</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.js"></script>
 <style>
@@ -424,6 +424,8 @@ input, select, textarea { font-family: var(--mono); }
     <div class="tb-pane on" id="tbp-code">
       <button class="t-btn" onclick="doUndo()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="9,14 4,9 9,4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>Undo</button>
+      <button class="t-btn" onclick="ed().redo();ed().focus()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="15,14 20,9 15,4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>Redo</button>
       <button class="t-btn" onclick="doCopy()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
       <button class="t-btn" onclick="openMagicPaste()">
@@ -938,15 +940,34 @@ function lay() {
 }
 
 function initKeyboard() {
+  let kbLayoutT = null;
+  let touchActive = false;
+  // Track touch state — don't relayout during active selection drag
+  document.addEventListener('touchstart', () => { touchActive = true;  }, { passive: true });
+  document.addEventListener('touchend',   () => { touchActive = false; }, { passive: true });
+
+  function scheduleKbLay(isVV) {
+    // Debounce: wait for keyboard animation to settle (300ms)
+    // and skip if user is mid-touch (prevents toolbar jumping during selection)
+    clearTimeout(kbLayoutT);
+    kbLayoutT = setTimeout(() => {
+      if (touchActive) { scheduleKbLay(isVV); return; } // retry if still touching
+      if (isVV) {
+        kbUp = (window.visualViewport.height / window.screen.height) < 0.72;
+      } else {
+        const bh = window._ppInnerH || window.innerHeight;
+        kbUp = window.innerHeight < bh * 0.75;
+      }
+      lay();
+      document.getElementById('rpb').classList.toggle('on', kbUp);
+    }, 300);
+  }
+
   if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      kbUp = (window.visualViewport.height / window.screen.height) < 0.72; lay(); document.getElementById('rpb').classList.toggle('on', kbUp);
-    });
+    window.visualViewport.addEventListener('resize', () => scheduleKbLay(true), { passive: true });
   } else {
-    const bh = window.innerHeight;
-    window.addEventListener('resize', () => {
-      kbUp = window.innerHeight < bh * 0.75; lay(); document.getElementById('rpb').classList.toggle('on', kbUp);
-    });
+    window._ppInnerH = window.innerHeight;
+    window.addEventListener('resize', () => scheduleKbLay(false));
   }
 }
 
@@ -1086,7 +1107,7 @@ async function loadFile(name) {
     } catch(e) { return toast('Failed: ' + e.message, 'bad'); }
   }
   curFile = name; ed().setValue(p.files[name].content || '', -1); ed().session.setMode(modeFor(name));
-  setHeaderFile(name, W.activeProject); setUD(false); swTab(/\.html?$/i.test(name) ? 'html' : 'py'); renderSide(); closeSide();
+  setHeaderFile(name, W.activeProject); setUD(false); swTab(/\.html?$/i.test(name) ? 'html' : 'py'); renderSide();
 }
 
 function confirmSaveAs() {
@@ -1110,7 +1131,7 @@ function confirmSaveAs() {
   }
 }
 
-function newFile() { curFile = null; ed().setValue('', -1); ed().session.setMode('ace/mode/python'); setHeaderFile('untitled.py', W.activeProject); setUD(false); swTab('py'); renderSide(); closeSide(); }
+function newFile() { curFile = null; ed().setValue('', -1); ed().session.setMode('ace/mode/python'); setHeaderFile('untitled.py', W.activeProject); setUD(false); swTab('py'); renderSide(); }
 function renameFile(name, e) { e.stopPropagation(); const n = prompt('Rename to:', name); if (!n || n === name) return; const p = activeProj(); if (!p) return; p.files[n] = p.files[name]; delete p.files[name]; if (curFile === name) { curFile = n; setHeaderFile(n, W.activeProject); ed().session.setMode(modeFor(n)); } saveWorkspace(); renderSide(); }
 function deleteFile(name, e) {
   e.stopPropagation();
@@ -1783,7 +1804,7 @@ function mpAction(action) {
     case 'insert':
       ed().insert(parsed);
       setUD(true); ed().focus();
-      toast('Inserted ' + parsed.length + ' chars', 'ok');
+      toastUndo('Inserted ' + parsed.split('\n').length + ' lines', 'ok');
       break;
 
     case 'raw':
@@ -1891,7 +1912,7 @@ function openBlockPicker() {
   if (!_bpBlocks.length) {
     ed().insert(mpParsed || '');
     setUD(true); ed().focus();
-    toast('No blocks found \u2014 inserted at cursor', '');
+    toastUndo('No blocks found \u2014 inserted at cursor', '');
     return;
   }
   document.getElementById('bp-search').value = '';
@@ -2067,7 +2088,10 @@ function openSide() { updateDynamicToolbars(); renderSide(); document.getElement
 function closeSide() { document.getElementById('side').classList.remove('on'); document.getElementById('ov').classList.remove('on'); editMode.local=false; editMode.synced=false; document.getElementById('wrap-local').classList.remove('edit-mode'); document.getElementById('wrap-synced').classList.remove('edit-mode'); document.getElementById('btn-edit-local').textContent='⚙️'; document.getElementById('btn-edit-synced').textContent='⚙️'; document.getElementById('btn-edit-local').classList.remove('on'); document.getElementById('btn-edit-synced').classList.remove('on'); }
 function openAI() { document.getElementById('ai-panel').classList.add('on'); document.getElementById('ai-btn').classList.add('on'); closeSide(); setTimeout(() => document.getElementById('ai-inp').focus(), 300); }
 function closeAI() { document.getElementById('ai-panel').classList.remove('on'); document.getElementById('ai-btn').classList.remove('on'); }
-function initGestures() { let tx = 0; document.addEventListener('touchstart', e => { if (e.target.closest('#side,#ai-panel,#sb,#tb,#outp')) return; tx = e.changedTouches[0].screenX; }, { passive: true }); document.addEventListener('touchend', e => { if (e.target.closest('#side,#ai-panel,#sb,#tb,#outp')) return; const dx = e.changedTouches[0].screenX - tx; if (Math.abs(dx) < 70) return; if (dx > 0) openSide(); else openAI(); }, { passive: true }); }
+function initGestures() {
+  // Swipe gestures intentionally removed — they triggered side panels
+  // unintentionally during text selection. Panels open via buttons only.
+}
 function openModal(id) { document.getElementById(id).classList.add('on'); } function closeModal(id) { document.getElementById(id).classList.remove('on'); }
 
 function openSearch() { srchOpen = true; document.getElementById('srch').classList.add('on'); lay(); setTimeout(() => { const inp = document.getElementById('srch-inp'); const sel = ed().getSelectedText(); if (sel && sel.length < 200) inp.value = sel; inp.focus(); if (inp.value) srchFind(); }, 80); }
