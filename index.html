@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="PixelPad">
 <link rel="manifest" href="./manifest.json">
-<title>pixelpadv6.7.2</title>
+<title>pixelpadv6.7.3</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.js"></script>
 <style>
@@ -1032,30 +1032,38 @@ async function deleteProj(name, e) {
   if (name === 'Default') return toast('Cannot delete Default', 'bad');
   if (!confirm(`Delete "${name}" locally?`)) return;
 
-  // Check if this project is synced to GitHub — offer to delete there too
   const proj = W.projects[name];
   const isSynced = proj && proj.isSynced;
+  let ghDeleteOk = false;
+
   if (isSynced && cfg.ghtoken) {
-    if (confirm(`Also delete the GitHub repo "${name}"?\n\nThis is permanent and cannot be undone.`)) {
+    if (confirm(`Also delete the GitHub repo "${name}"?\n\nRequires "delete_repo" scope on your PAT.\nThis is permanent and cannot be undone.`)) {
       try {
-        const hasUser = await ensureGhUser(); 
+        const hasUser = await ensureGhUser();
         if (hasUser) {
           await ghApi(`/repos/${ghUserCache}/${name}`, 'DELETE');
-          toast('GitHub repo deleted', 'ok');
+          ghDeleteOk = true;
         }
       } catch(err) {
-        toast('GitHub delete failed: ' + err.message, 'bad');
+        // Show error and bail — don't delete locally if GitHub delete failed
+        // so the user can fix their PAT scope and retry
+        const msg = err.message || '';
+        const hint = msg.includes('403') || msg.includes('Resource not accessible')
+          ? 'PAT needs "delete_repo" scope — update token in Settings'
+          : msg;
+        toast('GitHub delete failed: ' + hint, 'bad');
+        return;
       }
     }
   }
 
   delete W.projects[name];
-  W.localOrder = W.localOrder.filter(n => n !== name);
+  W.localOrder  = W.localOrder.filter(n => n !== name);
   W.syncedOrder = W.syncedOrder.filter(n => n !== name);
 
   if (W.activeProject === name) switchProj('Default');
   else { saveWorkspace(); renderSide(); }
-  toast('Project removed', 'ok');
+  toast(ghDeleteOk ? 'Deleted locally + GitHub ✓' : 'Project removed locally', 'ok');
 }
 
 function setHeaderFile(filename, projName) {
@@ -1104,7 +1112,45 @@ function confirmSaveAs() {
 
 function newFile() { curFile = null; ed().setValue('', -1); ed().session.setMode('ace/mode/python'); setHeaderFile('untitled.py', W.activeProject); setUD(false); swTab('py'); renderSide(); closeSide(); }
 function renameFile(name, e) { e.stopPropagation(); const n = prompt('Rename to:', name); if (!n || n === name) return; const p = activeProj(); if (!p) return; p.files[n] = p.files[name]; delete p.files[name]; if (curFile === name) { curFile = n; setHeaderFile(n, W.activeProject); ed().session.setMode(modeFor(n)); } saveWorkspace(); renderSide(); }
-function deleteFile(name, e) { e.stopPropagation(); if (!confirm(`Delete "${name}"?`)) return; const p = activeProj(); if (!p) return; delete p.files[name]; if (curFile === name) newFile(); saveWorkspace(); renderSide(); }
+function deleteFile(name, e) {
+  e.stopPropagation();
+  const p = activeProj(); if (!p) return;
+  const isSynced  = p.isSynced;
+  const hasSha    = p.files[name] && p.files[name].sha;
+  const ghPrompt  = isSynced && hasSha
+    ? `\n\nAlso delete "${name}" from the GitHub repo?`
+    : '';
+  if (!confirm(`Delete "${name}" locally?${ghPrompt}`)) return;
+
+  const doGhDelete = isSynced && hasSha;
+  const fileSha    = hasSha ? p.files[name].sha : null;
+
+  delete p.files[name];
+  if (curFile === name) newFile();
+  saveWorkspace(); renderSide();
+
+  if (doGhDelete) {
+    // Fire GitHub delete async — toast updates when done
+    toast('Deleting from GitHub…', '');
+    ensureGhUser().then(hasUser => {
+      if (!hasUser) return;
+      const repo     = W.activeProject;
+      const safeFile = encodeURIComponent(name);
+      return ghApi(`/repos/${ghUserCache}/${repo}/contents/${safeFile}`, 'DELETE', {
+        message: `Delete ${name} via PixelPad`,
+        sha: fileSha
+      });
+    }).then(() => {
+      toast(`Deleted ${name} from GitHub ✓`, 'ok');
+    }).catch(err => {
+      const msg = err.message || '';
+      const hint = msg.includes('404') ? 'File not found on GitHub (already deleted?)' : msg;
+      toast('GitHub delete failed: ' + hint, 'bad');
+    });
+  } else {
+    toast(`Deleted ${name}`, 'ok');
+  }
+}
 function flashSave() { const b = document.getElementById('tb-push-btn'); b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 1200); }
 
 function openMoveModal(name, e) {
