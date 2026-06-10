@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="PixelPad">
 <link rel="manifest" href="./manifest.json">
-<title>pixelpadv6.7.4</title>
+<title>pixelpadv6.7</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.js"></script>
 <style>
@@ -133,40 +133,51 @@ input, select, textarea { font-family: var(--mono); }
 .pan-title { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--mu); font-family: var(--ui); }
 .pan-close { width: 36px; height: 36px; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: var(--mu); font-size: 16px; }
 .pan-close:active { background: var(--rai); color: var(--tx); }
-
-.sec-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 6px; font-size: 11px; font-weight: 700; letter-spacing: .10em; color: var(--mu); background: var(--sur); font-family: var(--ui); }
-.sec-btn { font-size: 10px; font-weight: 700; color: var(--tx); background: var(--rai); border: 1px solid var(--bdr2); padding: 4px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: .08em; }
+#side-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.sec-hdr { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; font-size: 10px; font-weight: 700; letter-spacing: .12em; color: var(--mu); background: var(--sur); font-family: var(--ui); position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--bdr); }
+.sec-btn { font-size: 10px; font-weight: 700; color: var(--tx); background: var(--rai); border: 1px solid var(--bdr2); padding: 4px 8px; border-radius: 4px; }
 .sec-btn.on { color: var(--ac); border-color: var(--ac); }
-
-.proj-list-wrap { max-height: 25vh; overflow-y: auto; flex-shrink: 0; border-bottom: 1px solid var(--bdr); background: var(--bg); }
-.pl-item { display: flex; align-items: center; height: 40px; padding: 0 14px; border-bottom: 1px solid var(--sur); gap: 10px; cursor: pointer; transition: background .1s; }
+/* project rows */
+.pl-item { display: flex; align-items: center; min-height: 48px; padding: 0 14px; border-bottom: 1px solid var(--bdr); gap: 8px; cursor: pointer; background: var(--bg); }
 .pl-item:active { background: var(--rai); }
-.pl-item.on { background: var(--sur); border-left: 3px solid var(--ac); padding-left: 11px; }
-.pl-item.on-sync { background: #0f1320; border-left: 3px solid #60a5fa; padding-left: 11px; }
-.pl-icon { font-size: 12px; flex-shrink: 0; width: 16px; text-align: center; }
-.pl-name { flex: 1; font-size: 12px; color: var(--tx); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; font-family: var(--ui); }
-.pl-btn { width: 26px; height: 26px; display: none; align-items: center; justify-content: center; border-radius: 4px; color: var(--mu); font-size: 14px; background: var(--rai); border: 1px solid var(--bdr2); }
+.pl-item.on      { background: var(--sur); border-left: 3px solid var(--ac); padding-left: 11px; }
+.pl-item.on-sync { background: #080e1c; border-left: 3px solid #60a5fa; padding-left: 11px; }
+.pl-icon { font-size: 13px; flex-shrink: 0; }
+.pl-name { flex: 1; font-size: 13px; color: var(--tx); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; font-family: var(--ui); }
+.pl-badge { font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px; flex-shrink: 0; white-space: nowrap; }
+.pl-badge.gh  { background: #0d1525; color: #60a5fa; border: 1px solid #1e3a6e; }
+.pl-badge.loc { background: var(--rai); color: var(--mu); border: 1px solid var(--bdr2); }
+.pl-chevron { font-size: 10px; color: var(--mu); flex-shrink: 0; transition: transform .18s; margin-left: 2px; }
+.pl-item.on .pl-chevron, .pl-item.on-sync .pl-chevron { transform: rotate(90deg); }
+.pl-btn { width: 28px; height: 28px; display: none; align-items: center; justify-content: center; border-radius: 4px; color: var(--mu); font-size: 14px; background: var(--rai); border: 1px solid var(--bdr2); flex-shrink: 0; }
 .pl-btn:active { background: var(--bdr2); color: var(--tx); }
 .pl-del { color: var(--er); }
 .edit-mode .pl-btn { display: flex; }
-.edit-mode .pl-icon { display: none; }
-
-#proj-hdr { padding: 8px 14px 7px; border-bottom: 1px solid var(--bdr); flex-shrink: 0; background: var(--sur); border-top: 1px solid var(--bdr); }
-#proj-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
-#proj-name { font-size: 13px; font-weight: 700; color: var(--tx); display: flex; align-items: center; gap: 6px; }
-#proj-acts { display: flex; gap: 5px; }
-
+.edit-mode .pl-chevron, .edit-mode .pl-badge { display: none; }
+/* inline file panel */
+.pl-files { display: none; border-bottom: 2px solid var(--bdr2); }
+.pl-files.open { display: block; }
+.pl-file-acts { display: flex; gap: 5px; padding: 8px 14px 6px; }
 .f-acts { display: flex; gap: 5px; }
-.f-btn { flex: 1; height: 30px; background: var(--rai); border: 1px solid var(--bdr2); border-radius: 5px; font-size: 10px; font-weight: 700; color: var(--tx); transition: background .12s; }
+.f-btn { flex: 1; height: 30px; background: var(--rai); border: 1px solid var(--bdr2); border-radius: 5px; font-size: 10px; font-weight: 700; color: var(--tx); }
 .f-btn.dsh { background: transparent; border-style: dashed; color: var(--mu); }
-.f-btn.go { background: var(--ac); border-color: var(--ac); color: #000; }
+.f-btn.go  { background: var(--ac); border-color: var(--ac); color: #000; }
 .f-btn.pub { background: #60a5fa; border-color: #60a5fa; color: #000; }
-
-#fl { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); }
-.fi { display: flex; align-items: center; padding: 0 14px; height: 48px; border-bottom: 1px solid var(--bdr); gap: 9px; transition: background .12s; cursor: pointer; }
+/* archive accordion */
+.arc-hdr { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--bdr); cursor: pointer; background: var(--sur); user-select: none; }
+.arc-hdr:active { background: var(--rai); }
+.arc-label { flex: 1; font-size: 10px; font-weight: 700; letter-spacing: .1em; color: #555; font-family: var(--ui); text-transform: uppercase; }
+.arc-count { font-size: 10px; color: #444; font-family: var(--mono); }
+.arc-chevron { font-size: 10px; color: #555; transition: transform .18s; }
+.arc-hdr.open .arc-chevron { transform: rotate(90deg); }
+.arc-body { display: none; }
+.arc-hdr.open + .arc-body { display: block; }
+/* file rows */
+#fl { display: none; }
+.fi { display: flex; align-items: center; padding: 0 14px; height: 44px; border-bottom: 1px solid var(--bdr); gap: 9px; cursor: pointer; transition: background .12s; }
 .fi:active { background: var(--rai); }
 .fi.on { border-left: 3px solid var(--ac); padding-left: 11px; background: var(--sur); }
-.f-icon { width: 26px; height: 26px; border-radius: 5px; background: var(--rai); border: 1px solid var(--bdr2); display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; color: var(--mu); flex-shrink: 0; }
+.f-icon { width: 24px; height: 24px; border-radius: 4px; background: var(--rai); border: 1px solid var(--bdr2); display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; color: var(--mu); flex-shrink: 0; }
 .f-icon.py   { background: #0d1f0d; border-color: #1a3a1a; color: #4ec94e; }
 .f-icon.html { background: #0d0d1f; border-color: #1a1a3a; color: #6699ff; }
 .f-icon.js   { background: #1f1f0d; border-color: #3a3a1a; color: #ffcc00; }
@@ -174,11 +185,12 @@ input, select, textarea { font-family: var(--mono); }
 .f-icon.json { background: #1f0d1a; border-color: #3a1a30; color: #f472b6; }
 .f-icon.md   { background: #0d1a1f; border-color: #1a2a3a; color: #94a3b8; }
 .f-name { flex: 1; min-width: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.f-dl { font-size: 10px; color: #60a5fa; font-weight: 700; flex-shrink: 0; margin-right: 5px; }
+.f-dl  { font-size: 10px; color: #60a5fa; font-weight: 700; flex-shrink: 0; margin-right: 4px; }
 .f-age { font-size: 10px; color: var(--mu); flex-shrink: 0; }
 .f-act { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 4px; color: var(--mu); font-size: 12px; }
 .f-act:active { background: var(--rai); color: var(--tx); }
 .f-act.danger:active { color: var(--er); }
+#bk-sec { padding: 8px 14px; border-top: 1px solid var(--bdr2); background: var(--sur); flex-shrink: 0; }
 
 #ai-panel { position: fixed; top: 0; bottom: 0; right: -110%; width: min(340px, 100vw); background: var(--sur); border-left: 1px solid var(--bdr); z-index: 200; display: flex; flex-direction: column; transition: right .27s cubic-bezier(.4,0,.2,1); box-shadow: -6px 0 30px rgba(0,0,0,.7); }
 #ai-panel.on { right: 0; }
@@ -482,64 +494,43 @@ input, select, textarea { font-family: var(--mono); }
 
 <div id="side">
   <div class="pan-hdr">
-    <span class="pan-title">Workspaces</span>
+    <span class="pan-title">Projects</span>
     <button class="pan-close" onclick="closeSide()">&#x2715;</button>
   </div>
-
-  <div class="sec-hdr">
-    <span>☁️ SYNCED REPOS</span>
-    <div style="display:flex;gap:5px;">
-      <button class="sec-btn" onclick="openCloneModal()">⬇ Clone</button>
-      <button class="sec-btn" onclick="toggleEditMode('synced')" id="btn-edit-synced">⚙️</button>
+  <div id="side-scroll">
+    <!-- GitHub Projects section -->
+    <div class="sec-hdr">
+      <span>☁ GitHub Projects</span>
+      <div style="display:flex;gap:5px;">
+        <button class="sec-btn" onclick="openCloneModal()">⬇ Clone</button>
+        <button class="sec-btn" id="btn-edit-synced" onclick="toggleEditMode('synced')">⚙️</button>
+      </div>
     </div>
-  </div>
-  <div class="proj-list-wrap" id="wrap-synced">
     <div id="list-synced"></div>
-  </div>
 
-  <div class="sec-hdr">
-    <span>📱 LOCAL SCRATCHPADS</span>
-    <div style="display:flex;gap:5px;">
-      <button class="sec-btn" onclick="openNewProjModal()" style="color:var(--ac); border-color:var(--bdr2);">+ New</button>
-      <button class="sec-btn" onclick="toggleEditMode('local')" id="btn-edit-local">⚙️</button>
+    <!-- Local Projects section -->
+    <div class="sec-hdr" style="margin-top:4px;">
+      <span>📱 Local Projects</span>
+      <div style="display:flex;gap:5px;">
+        <button class="sec-btn" onclick="openNewProjModal()" style="color:var(--ac);">+ New</button>
+        <button class="sec-btn" id="btn-edit-local" onclick="toggleEditMode('local')">⚙️</button>
+      </div>
     </div>
-  </div>
-  <div class="proj-list-wrap" id="wrap-local">
     <div id="list-local"></div>
   </div>
 
-  <div id="proj-hdr">
-    <div id="proj-title-row">
-      <span id="proj-name">—</span>
-      <div id="proj-acts">
-        <button class="p-act danger" id="btn-unlink" style="display:none;" onclick="unlinkRepo()" title="Unlink from GitHub">🔌</button>
-        <button class="p-act danger" onclick="deleteProj(W.activeProject)" title="Delete Project">&#x2715;</button>
-      </div>
+  <div id="bk-sec">
+    <div style="display:flex;gap:5px;margin-bottom:5px;">
+      <button class="f-btn" onclick="trigImport()">📥 Import</button>
+      <button class="f-btn" onclick="expFile()">📤 Export</button>
     </div>
-    <div class="f-acts" id="hdr-acts-local">
-      <button class="f-btn dsh" onclick="newFile()">+ New File</button>
-      <button class="f-btn pub" onclick="publishProject()">☁️ Publish to GitHub</button>
-    </div>
-    <div class="f-acts" id="hdr-acts-synced" style="display:none;">
-      <button class="f-btn dsh" onclick="newFile()">+ File</button>
-      <button class="f-btn" onclick="pullFile(null)">↓ Pull</button>
-      <button class="f-btn go" onclick="pushFile()">↑ Push</button>
-    </div>
-  </div>
-  <div id="fl"></div>
-    <div id="bk-sec" style="padding: 8px 14px; border-top: 1px solid var(--bdr); background: var(--sur); flex-shrink: 0;">
-    <div style="display: flex; gap: 5px; margin-bottom: 5px;">
-      <button class="f-btn" onclick="trigImport()">📥 Import File</button>
-      <button class="f-btn" onclick="expFile()">📤 Export File</button>
-    </div>
-    <div style="display: flex; gap: 5px;">
-      <button class="f-btn" onclick="trigRestore()">📂 Restore Backup</button>
-      <button class="f-btn" onclick="backupAll()">📦 Save Backup</button>
+    <div style="display:flex;gap:5px;">
+      <button class="f-btn" onclick="trigRestore()">📂 Restore</button>
+      <button class="f-btn" onclick="backupAll()">📦 Backup</button>
     </div>
     <input type="file" id="imp-inp" style="display:none" onchange="impFile(this)">
     <input type="file" id="rest-inp" accept=".json" style="display:none" onchange="restBackup(this)">
   </div>
-  
 </div>
 
 <div id="ai-panel">
@@ -1013,25 +1004,29 @@ function switchProj(name) {
 
 function updateDynamicToolbars() {
   const p = activeProj(); const isSynced = p?.isSynced;
-  
+
+  // Header badge
   const b = document.getElementById('proj-badge');
-  if (isSynced) { b.classList.add('synced'); b.textContent = '☁️ ' + W.activeProject; }
-  else { b.classList.remove('synced'); b.textContent = '📱 ' + W.activeProject; }
+  if (b) {
+    if (isSynced) { b.classList.add('synced'); b.textContent = '☁ ' + W.activeProject; }
+    else { b.classList.remove('synced'); b.textContent = W.activeProject; }
+    b.classList.toggle('on', W.activeProject !== 'Default');
+  }
 
-  document.getElementById('hdr-acts-local').style.display = isSynced ? 'none' : 'flex';
-  document.getElementById('hdr-acts-synced').style.display = isSynced ? 'flex' : 'none';
-  document.getElementById('btn-unlink').style.display = isSynced ? 'flex' : 'none';
-
-  // Ribbon Git tab: show Pull+Push for synced, Publish for local
+  // Git ribbon buttons
   document.getElementById('tb-pull-btn').style.display    = isSynced ? 'flex' : 'none';
   document.getElementById('tb-push-btn').style.display    = isSynced ? 'flex' : 'none';
   document.getElementById('tb-publish-btn').style.display = isSynced ? 'none' : 'flex';
 
-  document.getElementById('ss-pull-btn').style.display = isSynced ? 'block' : 'none';
+  // Save strip
+  const ssPull = document.getElementById('ss-pull-btn');
+  if (ssPull) ssPull.style.display = isSynced ? 'block' : 'none';
   const ssPush = document.getElementById('ss-push-btn');
-  ssPush.textContent = isSynced ? 'GH Push' : 'Publish ☁️';
-  ssPush.className = isSynced ? 'ss-btn ss-pri' : 'ss-btn ss-pri pub';
-  ssPush.onclick = isSynced ? pushFile : publishProject;
+  if (ssPush) {
+    ssPush.textContent = isSynced ? 'GH Push' : 'Publish ☁';
+    ssPush.className   = isSynced ? 'ss-btn ss-pri' : 'ss-btn ss-pri pub';
+    ssPush.onclick     = isSynced ? pushFile : publishProject;
+  }
 }
 
 function openNewProjModal() { document.getElementById('newproj-inp').value = ''; openModal('mod-newproj'); setTimeout(() => document.getElementById('newproj-inp').focus(), 120); }
@@ -1177,8 +1172,12 @@ function flashSave() { const b = document.getElementById('tb-push-btn'); b.class
 function openMoveModal(name, e) {
   e.stopPropagation(); fileToMove = name;
   const sel = document.getElementById('move-target-sel');
+  const ghSet = new Set(W.syncedOrder);
   const allProjs = ['Default', ...W.localOrder, ...W.syncedOrder].filter(p => p !== W.activeProject);
-  sel.innerHTML = allProjs.map(p => `<option value="${p}">${p}</option>`).join('');
+  sel.innerHTML = allProjs.map(p => {
+    const label = ghSet.has(p) ? `[GH] ${p}` : `[Local] ${p}`;
+    return `<option value="${p}">${label}</option>`;
+  }).join('');
   document.getElementById('move-file-lbl').textContent = `Move "${name}" to:`;
   openModal('mod-movefile');
 }
@@ -1316,7 +1315,7 @@ async function doPushFile() {
 
 function toggleEditMode(listType) {
   editMode[listType] = !editMode[listType];
-  document.getElementById('wrap-' + listType).classList.toggle('edit-mode', editMode[listType]);
+  renderSide();
   const btn = document.getElementById('btn-edit-' + listType);
   btn.textContent = editMode[listType] ? '✓' : '⚙️';
   btn.classList.toggle('on', editMode[listType]);
@@ -1324,64 +1323,152 @@ function toggleEditMode(listType) {
 
 function moveProj(listType, idx, dir, e) {
   e.stopPropagation();
-  const arr = listType === 'synced' ? W.syncedOrder : W.localOrder;
-  if (dir === -1 && idx === 0) return;
-  if (dir === 1 && idx === arr.length - 1) return;
-  const temp = arr[idx]; arr[idx] = arr[idx + dir]; arr[idx + dir] = temp;
+  if (listType === 'local') {
+    // idx 0 is always 'Default' which is not in W.localOrder — offset by 1
+    const arr = W.localOrder;
+    const arrIdx = idx - 1; // convert render index to array index
+    if (arrIdx < 0) return; // can't move Default
+    if (dir === -1 && arrIdx === 0) return;
+    if (dir === 1 && arrIdx === arr.length - 1) return;
+    const temp = arr[arrIdx]; arr[arrIdx] = arr[arrIdx + dir]; arr[arrIdx + dir] = temp;
+  } else {
+    const arr = W.syncedOrder;
+    if (dir === -1 && idx === 0) return;
+    if (dir === 1 && idx === arr.length - 1) return;
+    const temp = arr[idx]; arr[idx] = arr[idx + dir]; arr[idx + dir] = temp;
+  }
   saveWorkspace(); renderSide();
 }
 
-function renderSide() {
-  const lSync = document.getElementById('list-synced');
-  if (!W.syncedOrder.length) lSync.innerHTML = '<div style="padding:10px;text-align:center;color:var(--bdr2);font-size:10px;">No synced repos</div>';
-  else {
-    lSync.innerHTML = W.syncedOrder.map((p, idx) => `
-      <div class="pl-item ${p === W.activeProject ? 'on-sync' : ''}">
-        <span class="pl-icon">☁️</span>
-        <span class="pl-name" onclick="switchProj('${esc(p)}')">${esc(p)}</span>
-        <button class="pl-btn" onclick="moveProj('synced', ${idx}, -1, event)">↑</button>
-        <button class="pl-btn" onclick="moveProj('synced', ${idx}, 1, event)">↓</button>
-        <button class="pl-btn pl-del" onclick="deleteProj('${esc(p)}', event)">✕</button>
-      </div>`).join('');
+// ── Project last-activity helper ──────────────────────────────────────────
+function projLastActive(projName) {
+  const p = W.projects[projName]; if (!p || !p.files) return 0;
+  const times = Object.values(p.files).map(f => f.savedAt || 0);
+  return times.length ? Math.max(0, ...times) : 0;
+}
+
+const ARCHIVE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+function renderProjGroup(container, projects, listType) {
+  if (!container) return;
+  const isEdit = editMode[listType];
+  const isSynced = listType === 'synced';
+  const now = Date.now();
+  const active = [], archived = [];
+
+  projects.forEach((p, idx) => {
+    if (!p || !W.projects[p]) return; // skip orphaned entries
+    const last = projLastActive(p);
+    if (!isEdit && last > 0 && (now - last) > ARCHIVE_MS) archived.push({ p, idx });
+    else active.push({ p, idx });
+  });
+
+  let html = '';
+
+  // Active projects
+  active.forEach(({ p, idx }) => {
+    const isActive = p === W.activeProject;
+    const cls = isActive ? (isSynced ? 'on-sync' : 'on') : '';
+    const badge = isSynced ? '<span class="pl-badge gh">GH</span>' : '<span class="pl-badge loc">Local</span>';
+    const chevron = isEdit ? '' : '<span class="pl-chevron">›</span>';
+
+    if (isEdit) {
+      html += `<div class="pl-item ${cls}" onclick="switchProj('${esc(p)}')">
+        <span class="pl-name">${esc(p)}</span>
+        <button class="pl-btn" onclick="moveProj('${listType}',${idx},-1,event)">↑</button>
+        <button class="pl-btn" onclick="moveProj('${listType}',${idx},1,event)">↓</button>
+        <button class="pl-btn pl-del" onclick="deleteProj('${esc(p)}',event)">✕</button>
+      </div>`;
+    } else {
+      html += `<div class="pl-item ${cls}" onclick="switchProj('${esc(p)}')">
+        <span class="pl-name">${esc(p)}</span>
+        ${badge}${chevron}
+      </div>`;
+    }
+
+    // Inline file panel — only render for active project
+    if (isActive && !isEdit) {
+      html += renderInlineFiles(p, isSynced);
+    }
+  });
+
+  // Archive accordion
+  if (archived.length) {
+    html += `<div class="arc-hdr" onclick="this.classList.toggle('open')">
+      <span class="arc-label">📦 Archive</span>
+      <span class="arc-count">${archived.length} project${archived.length > 1 ? 's' : ''}</span>
+      <span class="arc-chevron">›</span>
+    </div>
+    <div class="arc-body">`;
+    archived.forEach(({ p, idx }) => {
+      const isActive = p === W.activeProject;
+      const cls = isActive ? (isSynced ? 'on-sync' : 'on') : '';
+      const last = projLastActive(p);
+      const lastStr = last ? ago(last) + ' ago' : 'never';
+      html += `<div class="pl-item ${cls}" onclick="switchProj('${esc(p)}')">
+        <span class="pl-name" style="color:var(--mu)">${esc(p)}</span>
+        <span style="font-size:9px;color:#555;flex-shrink:0;">${lastStr}</span>
+        <span class="pl-chevron">›</span>
+      </div>`;
+      if (isActive && !isEdit) html += renderInlineFiles(p, isSynced);
+    });
+    html += '</div>';
   }
 
-  const lLoc = document.getElementById('list-local');
-  const defItem = `<div class="pl-item ${W.activeProject === 'Default' ? 'on' : ''}" onclick="switchProj('Default')"><span class="pl-icon">🏠</span><span class="pl-name">Default</span></div>`;
-  const locItems = W.localOrder.map((p, idx) => `
-    <div class="pl-item ${p === W.activeProject ? 'on' : ''}">
-      <span class="pl-icon">📁</span>
-      <span class="pl-name" onclick="switchProj('${esc(p)}')">${esc(p)}</span>
-      <button class="pl-btn" onclick="moveProj('local', ${idx}, -1, event)">↑</button>
-      <button class="pl-btn" onclick="moveProj('local', ${idx}, 1, event)">↓</button>
-      <button class="pl-btn pl-del" onclick="deleteProj('${esc(p)}', event)">✕</button>
-    </div>`).join('');
-  lLoc.innerHTML = defItem + locItems;
+  container.innerHTML = html || `<div style="padding:12px 14px;color:var(--mu);font-size:11px;">No projects yet</div>`;
+}
 
-  document.getElementById('proj-name').innerHTML = activeProj()?.isSynced ? `☁️ ${W.activeProject}` : `📱 ${W.activeProject}`;
-
-  const fl = document.getElementById('fl'); const files = activeFiles(); const keys = Object.keys(files);
-  if (!keys.length) { fl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--mu);font-size:11px;">No files yet</div>'; return; }
+function renderInlineFiles(projName, isSynced) {
+  const p = W.projects[projName]; if (!p) return '';
+  const files = p.files || {};
+  const keys = Object.keys(files).filter(k => files[k].downloaded !== false);
   keys.sort((a, b) => (files[b].savedAt || 0) - (files[a].savedAt || 0));
-  fl.innerHTML = keys.map(n => {
-    const [ic, it] = iconFor(n); const age = files[n].savedAt ? ago(files[n].savedAt) : ''; const on = n === curFile ? ' on' : '';
-    const dlIndicator = files[n].downloaded === false ? '<span class="f-dl">☁</span>' : '';
-    return `<div class="fi${on}">
-      <div class="f-icon ${ic}">${it}</div>
-      <span class="f-name" onclick="loadFile('${esc(n)}')">${dlIndicator}${esc(n)}</span>
-      <span class="f-age">${age}</span>
-      <div class="f-btns">
-        <button class="f-act" onclick="openMoveModal('${esc(n)}',event)" title="Move">⎘</button>
-        <button class="f-act" onclick="renameFile('${esc(n)}',event)">&#x270e;</button>
-        <button class="f-act danger" onclick="deleteFile('${esc(n)}',event)">&#x2715;</button>
-      </div>
-    </div>`;
-  }).join('');
+
+  const actionBtns = isSynced
+    ? `<button class="f-btn dsh" onclick="newFile()">+ File</button>
+       <button class="f-btn" onclick="pullFile(null)">↓ Pull</button>
+       <button class="f-btn go" onclick="pushFile()">↑ Push</button>
+       <button class="f-btn" style="min-width:28px;flex:0;" onclick="unlinkRepo()" title="Unlink">🔌</button>`
+    : `<button class="f-btn dsh" onclick="newFile()">+ New File</button>
+       <button class="f-btn pub" onclick="publishProject()">☁ Publish</button>
+       <button class="f-btn" style="min-width:28px;flex:0;color:var(--er);" onclick="deleteProj('${esc(projName)}',_noopEv)" title="Delete">✕</button>`;
+
+  const fileRows = keys.length
+    ? keys.map(n => {
+        const [ic, it] = iconFor(n);
+        const age = files[n].savedAt ? ago(files[n].savedAt) : '';
+        const on  = n === curFile ? ' on' : '';
+        const dlI = files[n].downloaded === false ? '<span class="f-dl">☁</span>' : '';
+        return `<div class="fi${on}">
+          <div class="f-icon ${ic}">${it}</div>
+          <span class="f-name" onclick="loadFile('${esc(n)}')">${dlI}${esc(n)}</span>
+          <span class="f-age">${age}</span>
+          <button class="f-act" onclick="openMoveModal('${esc(n)}',event)" title="Move">⎘</button>
+          <button class="f-act" onclick="renameFile('${esc(n)}',event)">✎</button>
+          <button class="f-act danger" onclick="deleteFile('${esc(n)}',event)">✕</button>
+        </div>`;
+      }).join('')
+    : '<div style="padding:12px 14px;color:var(--mu);font-size:11px;text-align:center;">No files yet</div>';
+
+  return `<div class="pl-files open">
+    <div class="pl-file-acts">${actionBtns}</div>
+    ${fileRows}
+  </div>`;
+}
+
+function renderSide() {
+  // GitHub section
+  renderProjGroup(document.getElementById('list-synced'), W.syncedOrder, 'synced');
+  // Local section — Default always first
+  const localAll = ['Default', ...W.localOrder];
+  renderProjGroup(document.getElementById('list-local'), localAll, 'local');
 }
 
 function modeFor(n) { if (/\.html?$/.test(n)) return 'ace/mode/html'; if (/\.js$/i.test(n)) return 'ace/mode/javascript'; if (/\.css$/i.test(n)) return 'ace/mode/css'; if (/\.json$/i.test(n)) return 'ace/mode/json'; if (/\.md$/i.test(n)) return 'ace/mode/markdown'; return 'ace/mode/python'; }
 function iconFor(n) { if (/\.html?$/i.test(n)) return ['html', 'HTM']; if (/\.js$/i.test(n)) return ['js', 'JS']; if (/\.css$/i.test(n)) return ['css', 'CSS']; if (/\.json$/i.test(n)) return ['json', '{}']; if (/\.md$/i.test(n)) return ['md', 'MD']; return ['py', 'PY']; }
 function esc(s) { return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
 function ago(ts) { const s = (Date.now() - ts) / 1000 | 0; if (s < 60) return 'now'; if (s < 3600) return (s / 60 | 0) + 'm'; if (s < 86400) return (s / 3600 | 0) + 'h'; return (s / 86400 | 0) + 'd'; }
+const _noopEv = { stopPropagation() {} }; // safe fake event for inline onclick handlers
 function swTab(t) { ['py','html'].forEach(k => { document.getElementById('tab-' + k).classList.toggle('on', k === t); document.getElementById('sg-'  + k).classList.toggle('on', k === t); }); }
 function si(raw) { const d = raw.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&thinsp;/g,'').replace(/&nbsp;/g,'').replace(/&#x21e5;/g,'    ').replace(/&#955;/g,'lambda '); ed().insert(d); ed().focus(); }
 function insBoiler() { ed().setValue(`<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>My Page</title>\n  <style>\n    body { margin: 0; font-family: sans-serif; }\n  </style>\n</head>\n<body>\n\n  <script>\n  <\/script>\n</body>\n</html>`, -1); ed().session.setMode('ace/mode/html'); ed().focus(); }
@@ -2084,8 +2171,26 @@ function copyErr() { if (!lastErr) return; navigator.clipboard.writeText(lastErr
 function errToAI() { if (!lastErr) return; document.getElementById('ai-inp').value = 'Fix this error:\n' + lastErr.trim(); document.getElementById('ai-inc').checked = true; openAI(); setTimeout(() => document.getElementById('ai-inp').focus(), 300); }
 (function() { const h = document.getElementById('outh'); let sy, sH; h.addEventListener('touchstart', e => { sy = e.touches[0].clientY; sH = outH; }, { passive: true }); h.addEventListener('touchmove', e => { const dy = sy - e.touches[0].clientY; outH = Math.max(60, Math.min(window.innerHeight * .8, sH + dy)); lay(); }, { passive: true }); })();
 
-function openSide() { updateDynamicToolbars(); renderSide(); document.getElementById('side').classList.add('on'); document.getElementById('ov').classList.add('on'); document.getElementById('ai-panel').classList.remove('on'); }
-function closeSide() { document.getElementById('side').classList.remove('on'); document.getElementById('ov').classList.remove('on'); editMode.local=false; editMode.synced=false; document.getElementById('wrap-local').classList.remove('edit-mode'); document.getElementById('wrap-synced').classList.remove('edit-mode'); document.getElementById('btn-edit-local').textContent='⚙️'; document.getElementById('btn-edit-synced').textContent='⚙️'; document.getElementById('btn-edit-local').classList.remove('on'); document.getElementById('btn-edit-synced').classList.remove('on'); }
+function openSide() {
+  try {
+    updateDynamicToolbars();
+    renderSide();
+  } catch(err) {
+    console.error('[PixelPad] openSide error:', err);
+  }
+  document.getElementById('side').classList.add('on');
+  document.getElementById('ov').classList.add('on');
+  document.getElementById('ai-panel').classList.remove('on');
+}
+function closeSide() {
+  document.getElementById('side').classList.remove('on');
+  document.getElementById('ov').classList.remove('on');
+  editMode.local = false; editMode.synced = false;
+  ['local','synced'].forEach(t => {
+    const btn = document.getElementById('btn-edit-' + t);
+    if (btn) { btn.textContent = '⚙️'; btn.classList.remove('on'); }
+  });
+}
 function openAI() { document.getElementById('ai-panel').classList.add('on'); document.getElementById('ai-btn').classList.add('on'); closeSide(); setTimeout(() => document.getElementById('ai-inp').focus(), 300); }
 function closeAI() { document.getElementById('ai-panel').classList.remove('on'); document.getElementById('ai-btn').classList.remove('on'); }
 function initGestures() {
